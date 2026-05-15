@@ -1611,7 +1611,13 @@ const STATUS_CSS    = { pending:'s-pending', processing:'s-processing', shipped:
 // ==================== STATE ====================
 let orders = JSON.parse(localStorage.getItem('orders') || '[]');
 let mappings = JSON.parse(localStorage.getItem('mappings') || '{}');
-let settings = JSON.parse(localStorage.getItem('settings') || '{}');
+let settings = (() => {
+  const saved = JSON.parse(localStorage.getItem('settings') || '{}');
+  // Default Supabase config — works even before manual setup
+  if (!saved.sbUrl) saved.sbUrl = 'https://apycjoijcqzbqchgdblp.supabase.co';
+  if (!saved.sbKey) saved.sbKey = 'sb_publishable_63zOAGDLEmJmBTHC61dxRw_4J1GQR-B';
+  return saved;
+})();
 let vendors = JSON.parse(localStorage.getItem('vendors') || '[]');
 let products = JSON.parse(localStorage.getItem('products') || '[]');
 let productNameMappings = JSON.parse(localStorage.getItem('productNameMappings') || '{}');
