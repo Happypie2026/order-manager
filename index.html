@@ -1903,29 +1903,40 @@ const SB = {
 
 // Load all data from Supabase into local state
 async function loadFromSupabase() {
-  try {
-    const [dbOrders, dbVendors, dbProducts, dbMappings, dbPNM, dbHA] = await Promise.all([
-      SB.get('orders', 'order=created_at.asc'),
-      SB.get('vendors', 'order=name.asc'),
-      SB.get('products', 'order=name.asc'),
-      SB.get('mappings'),
-      SB.get('product_name_mappings'),
-      SB.get('holding_areas', 'order=created_at.asc'),
-    ]);
-    orders       = dbOrders;
-    vendors      = dbVendors;
-    products     = dbProducts;
-    mappings     = Object.fromEntries(dbMappings.map(r => [r.platform, r.mapping]));
-    productNameMappings = Object.fromEntries(dbPNM.map(r => [r.key, r.items ? { items: r.items } : {}]));
-    holdingAreas = dbHA;
-    console.log('✅ Loaded from Supabase');
-  } catch(e) {
-    console.warn('Supabase load failed, using localStorage:', e.message);
-    // Fallback to localStorage
+  if (!settings.sbUrl || !settings.sbKey) {
+    console.warn('Supabase not configured, using localStorage');
     orders       = JSON.parse(localStorage.getItem('orders') || '[]');
     vendors      = JSON.parse(localStorage.getItem('vendors') || '[]');
     products     = JSON.parse(localStorage.getItem('products') || '[]');
     holdingAreas = JSON.parse(localStorage.getItem('holdingAreas') || '[]');
+    mappings     = JSON.parse(localStorage.getItem('mappings') || '{}');
+    productNameMappings = JSON.parse(localStorage.getItem('productNameMappings') || '{}');
+    return;
+  }
+  try {
+    const [dbOrders, dbVendors, dbProducts, dbMappings, dbPNM, dbHA] = await Promise.all([
+      SB.get('orders', 'select=*&order=created_at.asc&limit=10000'),
+      SB.get('vendors', 'select=*&order=name.asc'),
+      SB.get('products', 'select=*&order=name.asc'),
+      SB.get('mappings', 'select=*'),
+      SB.get('product_name_mappings', 'select=*'),
+      SB.get('holding_areas', 'select=*&order=created_at.asc'),
+    ]);
+    orders       = Array.isArray(dbOrders) ? dbOrders : [];
+    vendors      = Array.isArray(dbVendors) ? dbVendors : [];
+    products     = Array.isArray(dbProducts) ? dbProducts : [];
+    mappings     = Object.fromEntries((dbMappings||[]).map(r => [r.platform, r.mapping]));
+    productNameMappings = Object.fromEntries((dbPNM||[]).map(r => [r.key, r.items ? { items: r.items } : {}]));
+    holdingAreas = Array.isArray(dbHA) ? dbHA : [];
+    console.log(`✅ Loaded from Supabase — ${orders.length} 筆訂單`);
+  } catch(e) {
+    console.warn('Supabase load failed, using localStorage:', e.message);
+    orders       = JSON.parse(localStorage.getItem('orders') || '[]');
+    vendors      = JSON.parse(localStorage.getItem('vendors') || '[]');
+    products     = JSON.parse(localStorage.getItem('products') || '[]');
+    holdingAreas = JSON.parse(localStorage.getItem('holdingAreas') || '[]');
+    mappings     = JSON.parse(localStorage.getItem('mappings') || '{}');
+    productNameMappings = JSON.parse(localStorage.getItem('productNameMappings') || '{}');
   }
 }
 
@@ -3585,19 +3596,18 @@ function exportCSV() {
   downloadFile('\uFEFF' + csv, `orders_export_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
 }
 
-function deleteOrder(id) {
+async function deleteOrder(id) {
   if (!confirm('確定要刪除這筆訂單？此操作無法復原。')) return;
-  orders = orders.filter(o => o.id !== id);
-  saveOrders();
+  await deleteOrderFromDB(id);
   closeDrawer();
   renderOrders(); renderDashboard(); updatePendingBadge();
 }
 
-function bulkDelete() {
+async function bulkDelete() {
   if (!confirm(`確定要刪除已選取的 ${selectedOrders.size} 筆訂單？此操作無法復原。`)) return;
-  orders = orders.filter(o => !selectedOrders.has(o.id));
-  saveOrders();
-  selectedOrders.clear(); updateBulkBar();
+  const ids = [...selectedOrders];
+  for (const id of ids) await deleteOrderFromDB(id);
+  selectedOrders.clear(); updateBatchBar();
   renderOrders(); renderDashboard(); updatePendingBadge();
 }
 
