@@ -1709,6 +1709,8 @@ function toggleLoginPw() {
 }
 
 function checkAuth() {
+  // Make sure settings are loaded before showing login
+  loadSettings();
   if (currentUser) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('sidebarUserInfo').textContent =
