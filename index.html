@@ -1941,16 +1941,59 @@ async function loadFromSupabase() {
 }
 
 // Save helpers — write to both Supabase and localStorage
+// Supabase-safe order object — only include columns that exist in the DB
+function toDbOrder(o) {
+  return {
+    id: o.id,
+    platform: o.platform || '',
+    order_id: o.order_id || '',
+    buyer_name: o.buyer_name || '',
+    buyer_phone: o.buyer_phone || '',
+    buyer_phone_landline: o.buyer_phone_landline || '',
+    buyer_phone_mobile: o.buyer_phone_mobile || '',
+    buyer_email: o.buyer_email || '',
+    amount: o.amount || 0,
+    status: o.status || 'pending',
+    order_date: o.order_date || '',
+    product_name: o.product_name || '',
+    product_spec: o.product_spec || '',
+    platform_qty: o.platform_qty || '',
+    product_qty: o.product_qty || '',
+    customer_note: o.customer_note || '',
+    vendor_note: o.vendor_note || '',
+    shipping_interval: o.shipping_interval || '',
+    shipping_address: o.shipping_address || '',
+    shipping_city: o.shipping_city || '',
+    shipping_district: o.shipping_district || '',
+    shipping_detail: o.shipping_detail || '',
+    shipping_method: o.shipping_method || '',
+    tracking_number: o.tracking_number || '',
+    note: o.note || '',
+    linked_product_id: o.linked_product_id || '',
+    linked_products: o.linked_products || [],
+    items: o.items || [],
+    holding_area_id: o.holding_area_id || '',
+    is_merged_primary: o.is_merged_primary || false,
+    is_merged_secondary: o.is_merged_secondary || false,
+    merged_from: o.merged_from || [],
+    merged_into: o.merged_into || '',
+    created_at: o.created_at || new Date().toISOString(),
+  };
+}
+
 async function saveOrders() {
   localStorage.setItem('orders', JSON.stringify(orders));
-  try { if (orders.length) await SB.upsert('orders', orders); } catch(e) { console.warn('saveOrders:', e.message); }
+  if (!orders.length) return;
+  try {
+    await SB.upsert('orders', orders.map(toDbOrder));
+  } catch(e) { console.warn('saveOrders:', e.message); }
 }
-async function saveOrder(o) {
-  const idx = orders.findIndex(x => x.id === o.id);
-  if (idx >= 0) orders[idx] = o; else orders.push(o);
+
+async function saveOrder_DB(o) {
   localStorage.setItem('orders', JSON.stringify(orders));
-  try { await SB.upsert('orders', o); } catch(e) { console.warn('saveOrder:', e.message); }
+  try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('saveOrder_DB:', e.message); }
 }
+
 async function deleteOrderFromDB(id) {
   orders = orders.filter(o => o.id !== id);
   localStorage.setItem('orders', JSON.stringify(orders));
