@@ -1624,46 +1624,78 @@ let selectedOrders = new Set();
 const PER_PAGE = 15;
 
 // ==================== INIT ====================
-// ==================== AUTH / LOGIN ====================
-// Accounts stored as: [{ id, user, passHash, note }]
-// Simple hash: btoa(user + ':' + pass) — not cryptographic, but enough for internal use
-let accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-let currentUser = sessionStorage.getItem('currentUser') || null;
+// ==================== AUTH / LOGIN (Supabase) ====================
+let currentUser     = sessionStorage.getItem('currentUser') || null;
+let currentUserNote = sessionStorage.getItem('currentUserNote') || '';
 
-function simpleHash(user, pass) {
-  return btoa(unescape(encodeURIComponent(user.toLowerCase().trim() + '::' + pass)));
+// SHA-256 hash using Web Crypto API — matches Supabase SQL: encode(digest('user::pass','sha256'),'hex')
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-function doLogin() {
-  const user = (document.getElementById('loginUser')?.value || '').trim();
-  const pass = document.getElementById('loginPass')?.value || '';
+async function doLogin() {
+  const user  = (document.getElementById('loginUser')?.value || '').trim();
+  const pass  = document.getElementById('loginPass')?.value || '';
   const errEl = document.getElementById('loginError');
+  const btn   = document.querySelector('#loginScreen .btn-primary');
 
-  if (!user || !pass) { errEl.style.display = 'block'; errEl.textContent = '❌ 請輸入帳號和密碼'; return; }
+  if (!user || !pass) { errEl.style.display='block'; errEl.textContent='❌ 請輸入帳號和密碼'; return; }
 
-  const hash = simpleHash(user, pass);
-  const found = accounts.find(a => a.user.toLowerCase() === user.toLowerCase() && a.passHash === hash);
+  // Show loading
+  if (btn) { btn.textContent='驗證中…'; btn.disabled=true; }
+  errEl.style.display = 'none';
 
-  if (found) {
-    sessionStorage.setItem('currentUser', found.user);
-    currentUser = found.user;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('sidebarUserInfo').textContent = '👤 ' + found.user + (found.note ? '（' + found.note + '）' : '');
-    errEl.style.display = 'none';
-    document.getElementById('loginUser').value = '';
-    document.getElementById('loginPass').value = '';
-  } else {
+  try {
+    const sbUrl = settings.sbUrl;
+    const sbKey = settings.sbKey;
+
+    if (!sbUrl || !sbKey) {
+      // Fallback: no Supabase configured, reject login
+      throw new Error('尚未設定 Supabase，請先在設定頁面連線資料庫');
+    }
+
+    const hash = await sha256Hex(user + '::' + pass);
+
+    const res = await fetch(
+      `${sbUrl}/rest/v1/accounts?username=eq.${encodeURIComponent(user)}&pass_hash=eq.${hash}&select=id,username,note`,
+      { headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey } }
+    );
+
+    if (!res.ok) throw new Error('連線失敗，請檢查 Supabase 設定');
+
+    const rows = await res.json();
+
+    if (rows.length > 0) {
+      const found = rows[0];
+      currentUser     = found.username;
+      currentUserNote = found.note || '';
+      sessionStorage.setItem('currentUser', currentUser);
+      sessionStorage.setItem('currentUserNote', currentUserNote);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('sidebarUserInfo').textContent =
+        '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
+      document.getElementById('loginUser').value = '';
+      document.getElementById('loginPass').value = '';
+    } else {
+      errEl.style.display = 'block';
+      errEl.textContent = '❌ 帳號或密碼錯誤';
+      document.getElementById('loginPass').value = '';
+      document.getElementById('loginPass').focus();
+    }
+  } catch(e) {
     errEl.style.display = 'block';
-    errEl.textContent = '❌ 帳號或密碼錯誤';
-    document.getElementById('loginPass').value = '';
-    document.getElementById('loginPass').focus();
+    errEl.textContent = '❌ ' + e.message;
+  } finally {
+    if (btn) { btn.textContent='登入'; btn.disabled=false; }
   }
 }
 
 function doLogout() {
   if (!confirm('確定要登出嗎？')) return;
   sessionStorage.removeItem('currentUser');
-  currentUser = null;
+  sessionStorage.removeItem('currentUserNote');
+  currentUser = null; currentUserNote = '';
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
@@ -1677,54 +1709,68 @@ function toggleLoginPw() {
 }
 
 function checkAuth() {
-  // If no accounts exist yet, create a default one and show setup hint
-  if (accounts.length === 0) {
-    const defaultPass = 'admin123';
-    accounts.push({ id: generateId(), user: 'admin', passHash: simpleHash('admin', defaultPass), note: '預設管理員' });
-    localStorage.setItem('accounts', JSON.stringify(accounts));
-  }
-  // If already logged in (same session), skip login screen
   if (currentUser) {
     document.getElementById('loginScreen').style.display = 'none';
-    const found = accounts.find(a => a.user === currentUser);
-    document.getElementById('sidebarUserInfo').textContent = '👤 ' + currentUser + (found?.note ? '（' + found.note + '）' : '');
+    document.getElementById('sidebarUserInfo').textContent =
+      '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     setTimeout(() => document.getElementById('loginUser')?.focus(), 100);
   }
 }
 
-// ==================== ACCOUNT MANAGEMENT ====================
-function renderAccounts() {
+// ==================== ACCOUNT MANAGEMENT (Supabase) ====================
+let _sbAccounts = []; // cache from Supabase
+
+async function renderAccounts() {
   const tbody = document.getElementById('accountsBody');
   if (!tbody) return;
-  if (!accounts.length) {
-    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);text-align:center;padding:1rem">尚無帳號</td></tr>';
+
+  if (!settings.sbUrl || !settings.sbKey) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state" style="padding:1rem;color:var(--text3)">請先設定 Supabase 連線</td></tr>';
     return;
   }
-  tbody.innerHTML = accounts.map(a => `<tr>
-    <td style="font-weight:500">${a.user}</td>
-    <td style="color:var(--text2);font-size:12.5px">${a.note || '-'}</td>
-    <td style="white-space:nowrap">
-      <button class="btn btn-sm" onclick="openAccountModal('${a.id}')" style="margin-right:4px">編輯</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteAccount('${a.id}')">刪除</button>
-    </td>
-  </tr>`).join('');
+
+  tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);text-align:center;padding:1rem">載入中…</td></tr>';
+
+  try {
+    const res = await fetch(
+      `${settings.sbUrl}/rest/v1/accounts?select=id,username,note&order=username`,
+      { headers: { apikey: settings.sbKey, Authorization: 'Bearer ' + settings.sbKey } }
+    );
+    _sbAccounts = await res.json();
+
+    if (!_sbAccounts.length) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);text-align:center;padding:1rem">尚無帳號</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = _sbAccounts.map(a => `<tr>
+      <td style="font-weight:500">${a.username}</td>
+      <td style="color:var(--text2);font-size:12.5px">${a.note || '-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="openAccountModal('${a.id}')" style="margin-right:4px">編輯</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteAccount('${a.id}')">刪除</button>
+      </td>
+    </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:var(--danger);padding:1rem">載入失敗：${e.message}</td></tr>`;
+  }
 }
 
 function openAccountModal(id) {
-  const a = id ? accounts.find(x => x.id === id) : null;
+  const a = id ? _sbAccounts.find(x => x.id === id) : null;
   document.getElementById('accountModalTitle').textContent = a ? '編輯帳號' : '新增帳號';
-  document.getElementById('accUser').value = a?.user || '';
-  document.getElementById('accPass').value = '';
+  document.getElementById('accUser').value  = a?.username || '';
+  document.getElementById('accPass').value  = '';
   document.getElementById('accPass2').value = '';
-  document.getElementById('accNote').value = a?.note || '';
-  document.getElementById('accId').value = a?.id || '';
+  document.getElementById('accNote').value  = a?.note || '';
+  document.getElementById('accId').value    = a?.id || '';
   document.getElementById('accountModal').classList.add('show');
   setTimeout(() => document.getElementById('accUser').focus(), 100);
 }
 
-function saveAccount() {
+async function saveAccount() {
   const user  = document.getElementById('accUser').value.trim();
   const pass  = document.getElementById('accPass').value;
   const pass2 = document.getElementById('accPass2').value;
@@ -1732,40 +1778,61 @@ function saveAccount() {
   const id    = document.getElementById('accId').value;
 
   if (!user) { alert('請輸入帳號'); return; }
-
-  // Check duplicate username (allow same id)
-  if (accounts.find(a => a.user.toLowerCase() === user.toLowerCase() && a.id !== id)) {
-    alert(`帳號「${user}」已存在`); return;
-  }
-
   if (!id && !pass) { alert('請輸入密碼'); return; }
   if (pass && pass !== pass2) { alert('兩次密碼不一致'); return; }
   if (pass && pass.length < 6) { alert('密碼至少需要 6 個字元'); return; }
 
-  const existing = accounts.find(a => a.id === id);
-  const data = {
-    id: id || generateId(),
-    user,
-    passHash: pass ? simpleHash(user, pass) : existing?.passHash,
-    note,
-  };
+  const btn = document.querySelector('#accountModal .btn-primary');
+  if (btn) { btn.textContent='儲存中…'; btn.disabled=true; }
 
-  if (id) accounts = accounts.map(a => a.id === id ? data : a);
-  else accounts.push(data);
-
-  localStorage.setItem('accounts', JSON.stringify(accounts));
-  closeModal('accountModal');
-  renderAccounts();
+  try {
+    if (id) {
+      // Update
+      const body = { username: user, note };
+      if (pass) body.pass_hash = await sha256Hex(user + '::' + pass);
+      const res = await fetch(`${settings.sbUrl}/rest/v1/accounts?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { apikey: settings.sbKey, Authorization: 'Bearer ' + settings.sbKey,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('更新失敗');
+    } else {
+      // Insert
+      const hash = await sha256Hex(user + '::' + pass);
+      const res = await fetch(`${settings.sbUrl}/rest/v1/accounts`, {
+        method: 'POST',
+        headers: { apikey: settings.sbKey, Authorization: 'Bearer ' + settings.sbKey,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ id: generateId(), username: user, pass_hash: hash, note }),
+      });
+      if (!res.ok) throw new Error('新增失敗');
+    }
+    closeModal('accountModal');
+    renderAccounts();
+  } catch(e) {
+    alert('❌ ' + e.message);
+  } finally {
+    if (btn) { btn.textContent='儲存'; btn.disabled=false; }
+  }
 }
 
-function deleteAccount(id) {
-  const a = accounts.find(x => x.id === id);
-  if (accounts.length <= 1) { alert('至少需要保留一個帳號，無法刪除'); return; }
-  if (a?.user === currentUser) { alert('無法刪除目前登入中的帳號'); return; }
-  if (!confirm(`確定刪除帳號「${a?.user}」？`)) return;
-  accounts = accounts.filter(x => x.id !== id);
-  localStorage.setItem('accounts', JSON.stringify(accounts));
-  renderAccounts();
+async function deleteAccount(id) {
+  const a = _sbAccounts.find(x => x.id === id);
+  if (_sbAccounts.length <= 1) { alert('至少需要保留一個帳號，無法刪除'); return; }
+  if (a?.username === currentUser) { alert('無法刪除目前登入中的帳號'); return; }
+  if (!confirm(`確定刪除帳號「${a?.username}」？`)) return;
+
+  try {
+    const res = await fetch(`${settings.sbUrl}/rest/v1/accounts?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { apikey: settings.sbKey, Authorization: 'Bearer ' + settings.sbKey },
+    });
+    if (!res.ok) throw new Error('刪除失敗');
+    renderAccounts();
+  } catch(e) {
+    alert('❌ ' + e.message);
+  }
 }
 
 // ==================== SIDEBAR TOGGLE ====================
