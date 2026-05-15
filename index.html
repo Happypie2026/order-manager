@@ -80,6 +80,17 @@
   .sidebar.collapsed .nav-item span:not(.nav-badge) { display: none; }
   .sidebar.collapsed .nav-badge { display: none; }
   .nav-badge { margin-left: auto; background: var(--danger); color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 500; }
+  .nav-item-parent { cursor: pointer; }
+  .nav-item-parent .nav-arrow { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.35); transition: transform 0.2s; }
+  .nav-item-parent.open .nav-arrow { transform: rotate(90deg); }
+  .nav-submenu { overflow: hidden; max-height: 0; transition: max-height 0.25s ease; }
+  .nav-submenu.open { max-height: 300px; }
+  .nav-subitem { display: flex; align-items: center; gap: 8px; padding: 0.38rem 1rem 0.38rem 2.2rem; font-size: 12.5px; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; white-space: nowrap; border-left: 2px solid transparent; }
+  .nav-subitem:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.04); }
+  .nav-subitem.active { color: #fff; background: rgba(255,255,255,0.08); border-left-color: var(--accent-mid); }
+  .nav-subitem::before { content: '·'; font-size: 16px; color: rgba(255,255,255,0.25); flex-shrink: 0; }
+  .sidebar.collapsed .nav-submenu { display: none; }
+  .sidebar.collapsed .nav-item-parent .nav-arrow { display: none; }
 
   /* Supabase Config Banner */
   .config-banner { background: #fff3cd; border-bottom: 1px solid #ffc107; padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #856404; }
@@ -354,10 +365,18 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span>匯入訂單 CSV</span>
       </div>
-      <div class="nav-item" onclick="showPage('orders')">
+      <!-- 訂單管理 (展開式) -->
+      <div class="nav-item nav-item-parent" id="navOrdersParent" onclick="toggleOrdersNav()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span>訂單管理</span>
-        <span class="nav-badge" id="pendingBadge">0</span>
+        <span class="nav-arrow">▶</span>
+      </div>
+      <div class="nav-submenu" id="navOrdersSub">
+        <div class="nav-subitem" id="subOrders-active" onclick="showOrdersView('active')">訂單列表</div>
+        <div class="nav-subitem" id="subOrders-shipped" onclick="showOrdersView('shipped')">已出貨訂單</div>
+        <div class="nav-subitem" id="subOrders-cancelled" onclick="showOrdersView('cancelled')">已取消訂單</div>
+        <div class="nav-subitem" id="subOrders-holding" onclick="showOrdersView('holding')">訂單暫存區</div>
+        <div id="navHoldingAreaItems"></div>
       </div>
       <div class="nav-item" onclick="showPage('report')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -1843,6 +1862,71 @@ async function deleteAccount(id) {
   }
 }
 
+// ==================== ORDERS NAV ====================
+let _ordersNavOpen = false;
+let _currentOrdersView = 'active'; // 'active' | 'shipped' | 'cancelled' | 'holding'
+
+function toggleOrdersNav() {
+  _ordersNavOpen = !_ordersNavOpen;
+  document.getElementById('navOrdersParent').classList.toggle('open', _ordersNavOpen);
+  document.getElementById('navOrdersSub').classList.toggle('open', _ordersNavOpen);
+  if (_ordersNavOpen && currentPage !== 'orders') showOrdersView('active');
+}
+
+function showOrdersView(view) {
+  _currentOrdersView = view;
+  _ordersNavOpen = true;
+  document.getElementById('navOrdersParent').classList.add('open');
+  document.getElementById('navOrdersSub').classList.add('open');
+
+  // Update active subitem
+  ['active','shipped','cancelled','holding'].forEach(v => {
+    document.getElementById(`subOrders-${v}`)?.classList.toggle('active', v === view);
+  });
+
+  // Set filter based on view
+  orderFilter.holdingAreaId = '';
+  orderFilter.page = 1;
+  const statusSel = document.getElementById('orderStatusFilter');
+
+  if (view === 'active') {
+    if (statusSel) statusSel.value = 'processing';
+    orderFilter.holdingAreaId = '__none__';
+  } else if (view === 'shipped') {
+    if (statusSel) statusSel.value = 'shipped';
+    orderFilter.holdingAreaId = '';
+  } else if (view === 'cancelled') {
+    if (statusSel) statusSel.value = 'cancelled';
+    orderFilter.holdingAreaId = '';
+  } else if (view === 'holding') {
+    if (statusSel) statusSel.value = '';
+    // Show all holding area orders
+    orderFilter.holdingAreaId = '';
+  }
+
+  showPage('orders');
+}
+
+function updateNavHoldingAreas() {
+  const el = document.getElementById('navHoldingAreaItems');
+  if (!el) return;
+  el.innerHTML = holdingAreas.map(ha => `
+    <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
+      ${ha.locked ? '🔒 ' : ''}${ha.name}
+    </div>`).join('');
+}
+
+function showHoldingAreaView(haId) {
+  _currentOrdersView = 'holding';
+  ['active','shipped','cancelled','holding'].forEach(v =>
+    document.getElementById(`subOrders-${v}`)?.classList.toggle('active', v === 'holding'));
+  orderFilter.holdingAreaId = haId;
+  orderFilter.page = 1;
+  const statusSel = document.getElementById('orderStatusFilter');
+  if (statusSel) statusSel.value = '';
+  showPage('orders');
+}
+
 // ==================== SIDEBAR TOGGLE ====================
 let _sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
 
@@ -2073,6 +2157,7 @@ window.onload = async () => {
   renderReport();
   renderMappingCards();
   updatePendingBadge();
+  updateNavHoldingAreas();
   document.getElementById('sqlCode').value = SQL_CODE;
   selectImportPlat('momo', document.querySelector('.plat-tab[data-plat=momo]'));
 };
@@ -2083,12 +2168,23 @@ function loadSettings() {
 }
 
 // ==================== NAV ====================
+let currentPage = 'dashboard';
+
 function showPage(id) {
+  currentPage = id;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
-  const navItems = document.querySelectorAll('.nav-item');
-  navItems.forEach(n => { if (n.getAttribute('onclick')?.includes(id)) n.classList.add('active'); });
+
+  // Mark active nav item (skip orders — handled by submenu)
+  if (id !== 'orders') {
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.getAttribute('onclick')?.includes(`'${id}'`)) n.classList.add('active');
+    });
+  } else {
+    document.getElementById('navOrdersParent')?.classList.add('active');
+  }
+
   if (id === 'dashboard') renderDashboard();
   if (id === 'orders') { populateOrderVendorFilter(); renderHoldingAreas(); renderOrderPlatTabs(); renderOrders(); }
   if (id === 'report') renderReport();
@@ -2939,9 +3035,8 @@ function renderHoldingAreas() {
     html += `<div style="font-size:12px;color:var(--text3);padding:8px 4px;text-align:center">點上方 ＋ 建立暫存區</div>`;
   }
   el.innerHTML = html;
-}
-
-function setHoldingAreaFilter(id) {
+  updateNavHoldingAreas();
+}(id) {
   orderFilter.holdingAreaId = id;
   orderFilter.page = 1;
   renderHoldingAreas();
@@ -4860,9 +4955,7 @@ function downloadFile(content, filename, type) {
   a.download = filename; a.click();
 }
 function updatePendingBadge() {
-  const n = orders.filter(o => o.status === 'pending').length;
-  const b = document.getElementById('pendingBadge');
-  b.textContent = n; b.style.display = n > 0 ? 'inline' : 'none';
+  // Badge removed from UI — no-op kept for compatibility
 }
 
 const SQL_CODE = `-- 訂單主表
