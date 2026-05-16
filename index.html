@@ -4362,21 +4362,24 @@ function exportHsinchu(rows, dateStr) {
     const items = getOrderItems(o);
     const qty = items.reduce((s, it) => s + (parseInt(it.product_qty || it.platform_qty || 1) || 1), 0);
 
-    // 託運備註 = 廠商簡稱 (from linked products)
-    const shortNames = [];
+    // 託運備註 = 廠商簡稱+數量
+    const shortNameParts = [];
     items.forEach(it => {
       const linkedList = it.linked_products?.length
         ? it.linked_products
-        : (it.linked_product_id ? [{ product_id: it.linked_product_id }] : []);
+        : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty || it.platform_qty }] : []);
       linkedList.forEach(li => {
         const p = products.find(x => x.id === li.product_id);
-        if (p?.short_name) shortNames.push(p.short_name);
-        else if (p?.name) shortNames.push(p.name);
+        const sn = p?.short_name || p?.name || '';
+        const q = li.qty || it.product_qty || it.platform_qty || '';
+        if (sn) shortNameParts.push(q ? `${sn}${q}` : sn);
       });
     });
-    // Fallback to product name if no linked product
-    if (!shortNames.length && o.product_name) shortNames.push(o.product_name);
-    const note = [...new Set(shortNames)].join('+');
+    if (!shortNameParts.length && o.product_name) {
+      const q = o.product_qty || o.platform_qty || '';
+      shortNameParts.push(q ? `${o.product_name}${q}` : o.product_name);
+    }
+    const note = shortNameParts.join('+');
 
     return [
       idx + 1,                         // 序號
@@ -4386,7 +4389,7 @@ function exportHsinchu(rows, dateStr) {
       o.buyer_phone || '',             // 收件人電話
       note,                            // 託運備註 = 廠商簡稱
       '',                              // 商品別編號 (勿填)
-      qty,                             // 商品數量
+      '',                              // 商品數量 (不填)
       '',                              // 才積重量 (留空)
       '',                              // 代收貨款 (留空)
       '',                              // 指定配送日期 (不填)
@@ -4491,20 +4494,24 @@ function exportBlackCat(rows, dateStr, temp) {
   const data = rows.map(o => {
     const items = getOrderItems(o);
 
-    // 品名 = 廠商簡稱 (from linked products short_name)
-    const shortNames = [];
+    // 品名 = 廠商簡稱+數量
+    const shortNameParts = [];
     items.forEach(it => {
       const linkedList = it.linked_products?.length
         ? it.linked_products
-        : (it.linked_product_id ? [{ product_id: it.linked_product_id }] : []);
+        : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty || it.platform_qty }] : []);
       linkedList.forEach(li => {
         const p = products.find(x => x.id === li.product_id);
-        if (p?.short_name) shortNames.push(p.short_name);
-        else if (p?.name) shortNames.push(p.name);
+        const sn = p?.short_name || p?.name || '';
+        const q = li.qty || it.product_qty || it.platform_qty || '';
+        if (sn) shortNameParts.push(q ? `${sn}${q}` : sn);
       });
     });
-    if (!shortNames.length && o.product_name) shortNames.push(o.product_name);
-    const prodDesc = [...new Set(shortNames)].join('+');
+    if (!shortNameParts.length && o.product_name) {
+      const q = o.product_qty || o.platform_qty || '';
+      shortNameParts.push(q ? `${o.product_name}${q}` : o.product_name);
+    }
+    const prodDesc = shortNameParts.join('+');
 
     return [
       o.order_id || '',          // 訂單編號
