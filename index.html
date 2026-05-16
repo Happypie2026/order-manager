@@ -1035,9 +1035,9 @@
       <!-- Vendor + platform filters -->
       <div class="form-grid" style="margin-top:0.75rem">
         <div class="form-row" style="margin-bottom:0">
-          <label>廠商篩選</label>
+          <label>廠商篩選（選填）</label>
           <select id="vendorExportSelect" onchange="previewVendorExport()" style="width:100%">
-            <option value="">— 請選擇廠商 —</option>
+            <option value="">— 全部廠商 —</option>
             <option value="__all__">✅ 全部廠商（分別匯出）</option>
           </select>
         </div>
@@ -4160,7 +4160,7 @@ function setExportType(type, el) {
   el.classList.add('active');
   // Show/hide vendor selector for logistics types
   const vendorRow = document.getElementById('vendorExportSelect').closest('.form-row');
-  if (vendorRow) vendorRow.style.display = ['hsinchu','blackcat_warm','blackcat_cold'].includes(type) ? 'none' : 'block';
+  if (vendorRow) vendorRow.style.display = 'block'; // show for all types
   previewVendorExport();
 }
 
@@ -4260,8 +4260,8 @@ function getExportFilteredOrders(dateStr) {
     if (holdingMode === 'select') {
       if (o.holding_area_id && !selectedHAs.includes(o.holding_area_id)) return false;
     }
-    // Vendor filter: match via linked products' vendor_id
-    if (_exportType === 'vendor' && vendorId && vendorId !== '__all__') {
+    // Vendor filter — apply for all export types
+    if (vendorId && vendorId !== '__all__') {
       if (!orderBelongsToVendor(o, vendorId)) return false;
     }
     return true;
