@@ -4612,123 +4612,80 @@ function exportVendorExcel(vendorId, vendorName) {
 
 function exportVendorExcelRows(vendorName, rows, dateStr) {
   const wb = XLSX.utils.book_new();
-  // 新順序：訂單編號, 客戶姓名, 電話, 收件地址, 廠商簡稱, 出貨數量, 平台商品名稱, 商品規格, 客戶備註, 廠商端備註, 訂單金額, 配送方式, 狀態
-  const headerRow = ['訂單編號', '客戶姓名', '電話', '收件地址', '廠商簡稱', '出貨數量', '平台商品名稱', '商品規格', '客戶備註', '廠商端備註', '訂單金額', '配送方式', '狀態'];
-
-  // Helper: build one data row in new column order
-  function buildRow(orderId, buyerName, phone, address, shortName, qty, productName, productSpec, customerNote, vendorNote, amount, shippingMethod, status) {
-    return [orderId, buyerName, phone, address, shortName, qty, productName, productSpec, customerNote, vendorNote, amount, shippingMethod, status];
-  }
+  const headerRow = ['訂單編號', '客戶姓名', '電話', '收件地址', '廠商簡稱', '平台商品名稱', '商品規格', '客戶備註', '廠商端備註', '訂單金額', '配送方式', '狀態'];
 
   const dataRows = [];
+
   rows.forEach(o => {
     if (o.is_merged_secondary) return;
 
     const orderItems = getOrderItems(o);
 
-    if (orderItems.length > 1) {
-      // Merged / kangcheng multi-item order
-      orderItems.forEach((it, idx) => {
-        const linkedList = it.linked_products?.length
-          ? it.linked_products
-          : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty }] : []);
+    // Collect all short names with quantities from all items
+    const shortNameParts = [];
+    const productNameParts = [];
+    const productSpecParts = [];
 
-        if (linkedList.length > 0) {
-          linkedList.forEach((li, liIdx) => {
-            const p = products.find(x => x.id === li.product_id);
-            const shortName = p?.short_name || p?.name || '';
-            const isFirst = idx === 0 && liIdx === 0;
-            dataRows.push(buildRow(
-              isFirst ? (o.order_id || '')            : '',
-              isFirst ? (o.buyer_name || '')          : '',
-              isFirst ? (o.buyer_phone || '')         : '',
-              isFirst ? (o.shipping_address || '')    : '',
-              shortName,
-              li.qty || it.product_qty || '',
-              liIdx === 0 ? (it.product_name || '')   : '',
-              liIdx === 0 ? (it.product_spec || '')   : '',
-              isFirst ? (o.customer_note || '')       : '',
-              isFirst ? (o.vendor_note || '')         : '',
-              isFirst ? (o.amount || '')              : '',
-              isFirst ? (o.shipping_method || '')     : '',
-              isFirst ? (STATUS_LABELS[o.status] || o.status || '') : '',
-            ));
-          });
-        } else {
-          const shortName = lookupProductShortName(it.product_name, it.linked_product_id);
-          const isFirst = idx === 0;
-          dataRows.push(buildRow(
-            isFirst ? (o.order_id || '')         : '',
-            isFirst ? (o.buyer_name || '')       : '',
-            isFirst ? (o.buyer_phone || '')      : '',
-            isFirst ? (o.shipping_address || '') : '',
-            shortName,
-            it.product_qty || '',
-            it.product_name || '',
-            it.product_spec || '',
-            isFirst ? (o.customer_note || '')    : '',
-            isFirst ? (o.vendor_note || '')      : '',
-            isFirst ? (o.amount || '')           : '',
-            isFirst ? (o.shipping_method || '')  : '',
-            isFirst ? (STATUS_LABELS[o.status] || o.status || '') : '',
-          ));
-        }
-      });
-    } else {
-      // Single-item order
-      const linkedItems = o.linked_products?.length
-        ? o.linked_products
-        : (o.linked_product_id ? [{ product_id: o.linked_product_id, qty: o.product_qty }] : []);
+    orderItems.forEach(it => {
+      const linkedList = it.linked_products?.length
+        ? it.linked_products
+        : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty || it.platform_qty }] : []);
 
-      if (linkedItems.length > 0) {
-        linkedItems.forEach((it, idx) => {
-          const p = products.find(x => x.id === it.product_id);
+      if (linkedList.length > 0) {
+        linkedList.forEach(li => {
+          const p = products.find(x => x.id === li.product_id);
           const shortName = p?.short_name || p?.name || '';
-          dataRows.push(buildRow(
-            idx === 0 ? (o.order_id || '')         : '',
-            idx === 0 ? (o.buyer_name || '')       : '',
-            idx === 0 ? (o.buyer_phone || '')      : '',
-            idx === 0 ? (o.shipping_address || '') : '',
-            shortName,
-            it.qty || o.product_qty || '',
-            idx === 0 ? (o.product_name || '')     : '',
-            idx === 0 ? (o.product_spec || '')     : '',
-            idx === 0 ? (o.customer_note || '')    : '',
-            idx === 0 ? (o.vendor_note || '')      : '',
-            idx === 0 ? (o.amount || '')           : '',
-            idx === 0 ? (o.shipping_method || '')  : '',
-            idx === 0 ? (STATUS_LABELS[o.status] || o.status || '') : '',
-          ));
+          const qty = li.qty || it.product_qty || it.platform_qty || '';
+          if (shortName) shortNameParts.push(qty ? `${shortName}${qty}` : shortName);
         });
       } else {
-        const shortName = lookupProductShortName(o.product_name, o.linked_product_id);
-        dataRows.push(buildRow(
-          o.order_id || '', o.buyer_name || '', o.buyer_phone || '',
-          o.shipping_address || '',
-          shortName,
-          o.product_qty || '',
-          o.product_name || '', o.product_spec || '',
-          o.customer_note || '', o.vendor_note || '',
-          o.amount || '', o.shipping_method || '',
-          STATUS_LABELS[o.status] || o.status || '',
-        ));
+        const shortName = lookupProductShortName(it.product_name, it.linked_product_id);
+        const qty = it.product_qty || it.platform_qty || '';
+        if (shortName) shortNameParts.push(qty ? `${shortName}${qty}` : shortName);
       }
+
+      if (it.product_name) productNameParts.push(it.product_name);
+      if (it.product_spec) productSpecParts.push(it.product_spec);
+    });
+
+    // Fallback for single-product orders with no items[]
+    if (shortNameParts.length === 0) {
+      const shortName = lookupProductShortName(o.product_name, o.linked_product_id);
+      const qty = o.product_qty || o.platform_qty || '';
+      if (shortName) shortNameParts.push(qty ? `${shortName}${qty}` : shortName);
     }
+    if (productNameParts.length === 0 && o.product_name) productNameParts.push(o.product_name);
+    if (productSpecParts.length === 0 && o.product_spec) productSpecParts.push(o.product_spec);
+
+    dataRows.push([
+      o.order_id || '',
+      o.buyer_name || '',
+      o.buyer_phone || '',
+      o.shipping_address || '',
+      shortNameParts.join('+'),
+      productNameParts.join('+'),
+      productSpecParts.join('+'),
+      o.customer_note || '',
+      o.vendor_note || '',
+      o.amount || '',
+      o.shipping_method || '',
+      STATUS_LABELS[o.status] || o.status || '',
+    ]);
   });
 
   const titleRow = [`${vendorName} 出貨單 — ${dateStr}（共 ${rows.length} 筆訂單）`];
   const ws = XLSX.utils.aoa_to_sheet([titleRow, [], headerRow, ...dataRows]);
 
-  // Col widths: 訂單編號, 客戶姓名, 電話, 收件地址, 廠商簡稱, 出貨數量, 平台商品名稱, 商品規格, 客戶備註, 廠商端備註, 訂單金額, 配送方式, 狀態
-  ws['!cols'] = [16, 12, 14, 30, 14, 8, 22, 14, 22, 18, 10, 12, 8].map(w => ({ wch: w }));
-  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:12} }];
+  // Col widths: 訂單編號, 客戶姓名, 電話, 收件地址, 廠商簡稱, 平台商品名稱, 商品規格, 客戶備註, 廠商端備註, 訂單金額, 配送方式, 狀態
+  ws['!cols'] = [16, 12, 14, 30, 20, 22, 14, 22, 18, 10, 12, 8].map(w => ({ wch: w }));
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:11} }];
 
-  for (let C = 0; C <= 12; C++) {
+  for (let C = 0; C <= 11; C++) {
     const cell = XLSX.utils.encode_cell({ r: 2, c: C });
     if (!ws[cell]) continue;
     ws[cell].s = { font: { bold: true }, fill: { fgColor: { rgb: 'E8F0EB' } } };
   }
-  // Highlight 廠商簡稱 col (now col 4)
+  // Highlight 廠商簡稱 col (col 4)
   for (let R = 3; R < dataRows.length + 3; R++) {
     const cell = XLSX.utils.encode_cell({ r: R, c: 4 });
     if (!ws[cell]) ws[cell] = { t: 's', v: '' };
