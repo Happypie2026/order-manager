@@ -1892,7 +1892,7 @@ function showOrdersView(view) {
   const statusSel = document.getElementById('orderStatusFilter');
 
   if (view === 'active') {
-    if (statusSel) statusSel.value = 'processing';
+    if (statusSel) statusSel.value = '';
     orderFilter.holdingAreaId = '__none__';
   } else if (view === 'shipped') {
     if (statusSel) statusSel.value = 'shipped';
@@ -1902,8 +1902,8 @@ function showOrdersView(view) {
     orderFilter.holdingAreaId = '';
   } else if (view === 'holding') {
     if (statusSel) statusSel.value = '';
-    // Show all holding area orders
-    orderFilter.holdingAreaId = '';
+    // Show orders that have a holding_area_id set
+    orderFilter.holdingAreaId = '__has_holding__';
   }
 
   showPage('orders');
@@ -2838,6 +2838,8 @@ function renderOrders() {
     if (haId) {
       if (haId === '__none__') {
         if (o.holding_area_id) return false; // show only unassigned
+      } else if (haId === '__has_holding__') {
+        if (!o.holding_area_id) return false; // show only those in any holding area
       } else {
         if (o.holding_area_id !== haId) return false;
       }
@@ -2943,7 +2945,11 @@ function toggleSelectAll(cb) {
   let filtered = orders.filter(o => {
     if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
     if (st && o.status !== st) return false;
-    if (haId) { if (haId==='__none__'?o.holding_area_id:o.holding_area_id!==haId) return false; }
+    if (haId) {
+      if (haId === '__none__') { if (o.holding_area_id) return false; }
+      else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
+      else { if (o.holding_area_id !== haId) return false; }
+    }
     if (vendId) {
       const pids = (o.linked_products||[]).map(l=>l.product_id).concat(o.linked_product_id||'').filter(Boolean);
       if (!pids.some(pid => products.find(x=>x.id===pid)?.vendor_id===vendId)) return false;
