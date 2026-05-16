@@ -3038,7 +3038,9 @@ function renderHoldingAreas() {
   }
   el.innerHTML = html;
   updateNavHoldingAreas();
-}(id) {
+}
+
+function setHoldingAreaFilter(id) {
   orderFilter.holdingAreaId = id;
   orderFilter.page = 1;
   renderHoldingAreas();
