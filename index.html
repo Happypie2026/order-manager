@@ -1665,20 +1665,21 @@ async function doLogin() {
   const errEl = document.getElementById('loginError');
   const btn   = document.querySelector('#loginScreen .btn-primary');
 
-  if (!user || !pass) { errEl.style.display='block'; errEl.textContent='❌ 請輸入帳號和密碼'; return; }
+  if (!user || !pass) {
+    errEl.style.display = 'block';
+    errEl.textContent = '❌ 請輸入帳號和密碼';
+    return;
+  }
 
-  // Show loading
-  if (btn) { btn.textContent='驗證中…'; btn.disabled=true; }
+  if (btn) { btn.textContent = '驗證中…'; btn.disabled = true; }
   errEl.style.display = 'none';
 
   try {
-    const sbUrl = settings.sbUrl;
-    const sbKey = settings.sbKey;
+    // Ensure settings are loaded
+    loadSettings();
 
-    if (!sbUrl || !sbKey) {
-      // Fallback: no Supabase configured, reject login
-      throw new Error('尚未設定 Supabase，請先在設定頁面連線資料庫');
-    }
+    const sbUrl = settings.sbUrl || 'https://apycjoijcqzbqchgdblp.supabase.co';
+    const sbKey = settings.sbKey || 'sb_publishable_63zOAGDLEmJmBTHC61dxRw_4J1GQR-B';
 
     const hash = await sha256Hex(user + '::' + pass);
 
@@ -1687,7 +1688,7 @@ async function doLogin() {
       { headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey } }
     );
 
-    if (!res.ok) throw new Error('連線失敗，請檢查 Supabase 設定');
+    if (!res.ok) throw new Error(`連線失敗 (${res.status})，請稍後再試`);
 
     const rows = await res.json();
 
@@ -1698,8 +1699,8 @@ async function doLogin() {
       sessionStorage.setItem('currentUser', currentUser);
       sessionStorage.setItem('currentUserNote', currentUserNote);
       document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('sidebarUserInfo').textContent =
-        '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
+      const info = document.getElementById('sidebarUserInfo');
+      if (info) info.textContent = '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
       document.getElementById('loginUser').value = '';
       document.getElementById('loginPass').value = '';
     } else {
@@ -1710,9 +1711,10 @@ async function doLogin() {
     }
   } catch(e) {
     errEl.style.display = 'block';
-    errEl.textContent = '❌ ' + e.message;
+    errEl.textContent = '❌ ' + (e.message || '登入失敗，請重試');
+    console.error('doLogin error:', e);
   } finally {
-    if (btn) { btn.textContent='登入'; btn.disabled=false; }
+    if (btn) { btn.textContent = '登入'; btn.disabled = false; }
   }
 }
 
