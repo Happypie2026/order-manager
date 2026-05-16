@@ -533,7 +533,8 @@
         <div style="text-align:center;padding:2rem 0">
           <div style="font-size:48px;margin-bottom:16px">✅</div>
           <div style="font-size:20px;font-weight:700;color:var(--success);margin-bottom:8px">匯入成功！</div>
-          <div id="importResult" style="font-size:14px;color:var(--text2);margin-bottom:1.5rem"></div>
+          <div id="importResult" style="font-size:14px;color:var(--text2);margin-bottom:1rem"></div>
+          <div id="importDuplicateWarn" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:1.25rem;font-size:13px;color:#b91c1c;text-align:left"></div>
           <div class="btn-row" style="justify-content:center">
             <button class="btn btn-primary" onclick="showPage('orders')">查看訂單</button>
             <button class="btn" onclick="resetImport()">再次匯入</button>
@@ -2456,7 +2457,12 @@ function doImport() {
     const m = importState.mapping;
     const orderId = row[m.order_id] ? String(row[m.order_id]).trim() : '';
     if (!orderId) { skipped++; return; }
-    if (existingIds.has(orderId)) { skipped++; return; }
+    if (existingIds.has(orderId)) {
+      skipped++;
+      importState._duplicates = importState._duplicates || [];
+      importState._duplicates.push(orderId);
+      return;
+    }
 
     const statusRaw = m.status ? (row[m.status] || '').trim() : '';
     const status = normalizeStatus(statusRaw);
@@ -2774,8 +2780,27 @@ function skipProductMapping() {
 function finishImport() {
   const added = importState._added || 0;
   const skipped = importState._skipped || 0;
-  document.getElementById('importResult').textContent =
-    `成功匯入 ${added} 筆訂單，略過 ${skipped} 筆（重複或空白）`;
+  const duplicates = importState._duplicates || [];
+
+  let html = `成功匯入 ${added} 筆訂單`;
+  if (skipped > 0) html += `，略過 ${skipped} 筆（重複或空白）`;
+
+  document.getElementById('importResult').innerHTML = html;
+
+  // Show duplicate warning
+  const warnEl = document.getElementById('importDuplicateWarn');
+  if (duplicates.length > 0 && warnEl) {
+    warnEl.style.display = 'block';
+    warnEl.innerHTML = `
+      <div style="font-weight:700;margin-bottom:6px">⚠️ 以下 ${duplicates.length} 筆訂單已存在，略過不重複匯入：</div>
+      <div style="max-height:120px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8">
+        ${duplicates.map(id => `<div>• ${id}</div>`).join('')}
+      </div>`;
+  } else if (warnEl) {
+    warnEl.style.display = 'none';
+  }
+
+  importState._duplicates = [];
   setImportStep(5);
 }
 
