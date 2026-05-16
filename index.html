@@ -1886,7 +1886,7 @@ function showOrdersView(view) {
     document.getElementById(`subOrders-${v}`)?.classList.toggle('active', v === view);
   });
 
-  // Set filter based on view
+  // Reset all filters first
   orderFilter.holdingAreaId = '';
   orderFilter.page = 1;
   const statusSel = document.getElementById('orderStatusFilter');
@@ -1896,13 +1896,10 @@ function showOrdersView(view) {
     orderFilter.holdingAreaId = '__none__';
   } else if (view === 'shipped') {
     if (statusSel) statusSel.value = 'shipped';
-    orderFilter.holdingAreaId = '';
   } else if (view === 'cancelled') {
     if (statusSel) statusSel.value = 'cancelled';
-    orderFilter.holdingAreaId = '';
   } else if (view === 'holding') {
     if (statusSel) statusSel.value = '';
-    // Show orders that have a holding_area_id set
     orderFilter.holdingAreaId = '__has_holding__';
   }
 
