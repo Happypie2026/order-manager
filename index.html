@@ -325,7 +325,16 @@
     .batchHoldOptions { flex-direction: column; }
   }
 
-  /* Bottom nav (mobile only) */
+  /* Stock table — keep as real table on mobile, just scroll horizontally */
+  .stock-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stock-table-wrap table { display: table; min-width: 600px; }
+  .stock-table-wrap thead { display: table-header-group; }
+  .stock-table-wrap tbody { display: table-row-group; }
+  .stock-table-wrap tr { display: table-row; background: initial; border: none; border-radius: 0; padding: 0; }
+  .stock-table-wrap td { display: table-cell; padding: 10px 12px; border: none; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .stock-table-wrap td:before { display: none; }
+  .stock-table-wrap td:first-child { display: table-cell; }
+  .stock-table-wrap td:last-child { border-top: none; padding-top: 10px; justify-content: initial; }
   #mobileNav {
     display: none;
     position: fixed;
@@ -4218,7 +4227,7 @@ function renderStockSummary() {
   }).join('');
 
   el.innerHTML = `
-    <div class="table-wrap" style="margin-bottom:1.25rem">
+    <div class="table-wrap stock-table-wrap" style="margin-bottom:1.25rem">
       <table>
         <thead><tr>
           <th>商品</th>
