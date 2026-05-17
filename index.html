@@ -4184,13 +4184,13 @@ function renderStockSummary() {
   if (!el) return;
 
   if (!trackedProducts.length) {
-    el.innerHTML = `<div style="grid-column:1/-1;color:var(--text3);font-size:13px;padding:1rem 0">
+    el.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:1rem 0">
       尚無設定追蹤庫存的商品。請到「商品管理」開啟商品的「追蹤庫存」選項。
     </div>`;
     return;
   }
 
-  el.innerHTML = trackedProducts.map(p => {
+  const rows = trackedProducts.map(p => {
     const { current, totalIn, totalSold } = calcCurrentStock(p.id);
     const { perDay, sold30 } = calcSalesSpeed(p.id);
     const daysLeft = perDay > 0 ? Math.floor(current / perDay) : null;
@@ -4198,36 +4198,42 @@ function renderStockSummary() {
     const isLow = current <= alert;
     const v = vendors.find(vd => vd.id === p.vendor_id);
 
-    return `<div style="background:var(--surface);border:1.5px solid ${isLow ? 'var(--danger)' : 'var(--border)'};border-radius:var(--radius);padding:1rem">
-      <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:8px">
-        <div>
-          <div style="font-size:13.5px;font-weight:700">${p.name}</div>
-          <div style="font-size:11.5px;color:var(--text3);margin-top:2px">${p.sku}${v ? ' · ' + v.name : ''}</div>
-        </div>
-        ${isLow ? `<span style="background:#fee2e2;color:#b91c1c;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;flex-shrink:0">⚠️ 庫存不足</span>` : ''}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px">
-          <div style="font-size:20px;font-weight:700;color:${isLow?'var(--danger)':'var(--text)'}">${current}</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">當前庫存</div>
-        </div>
-        <div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px">
-          <div style="font-size:20px;font-weight:700;color:var(--info)">${sold30}</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">近30天出貨</div>
-        </div>
-        <div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px">
-          <div style="font-size:20px;font-weight:700;color:${daysLeft !== null && daysLeft < 14 ? 'var(--warning)' : 'var(--text)'}">${daysLeft !== null ? daysLeft + '天' : '—'}</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">預估可售</div>
-        </div>
-      </div>
-      <div style="font-size:12px;color:var(--text2);display:flex;justify-content:space-between;margin-bottom:8px">
-        <span>總進貨：${totalIn} 件</span>
-        <span>已出貨：${totalSold} 件</span>
-        <span>日均：${perDay} 件/天</span>
-      </div>
-      <button onclick="openStockModal('${p.id}')" class="btn btn-sm" style="width:100%;justify-content:center">＋ 新增進貨</button>
-    </div>`;
+    const daysColor = daysLeft === null ? 'var(--text3)' : daysLeft < 7 ? 'var(--danger)' : daysLeft < 14 ? 'var(--warning)' : 'var(--success)';
+
+    return `<tr style="${isLow ? 'background:#fff5f5' : ''}">
+      <td>
+        <div style="font-weight:600;font-size:13px">${p.name}</div>
+        <div style="font-size:11px;color:var(--text3)">${p.sku}${v ? ' · ' + v.name : ''}</div>
+      </td>
+      <td style="text-align:center">
+        <span style="font-size:16px;font-weight:700;color:${isLow ? 'var(--danger)' : 'var(--text)'}">${current}</span>
+        ${isLow ? `<div style="font-size:10px;color:var(--danger)">⚠️ 不足</div>` : ''}
+      </td>
+      <td style="text-align:center;color:var(--text2)">${totalIn}</td>
+      <td style="text-align:center;color:var(--info)">${sold30}</td>
+      <td style="text-align:center;color:var(--text2)">${perDay > 0 ? perDay + ' 件/天' : '—'}</td>
+      <td style="text-align:center;font-weight:600;color:${daysColor}">${daysLeft !== null ? daysLeft + ' 天' : '—'}</td>
+      <td style="text-align:right">
+        <button onclick="openStockModal('${p.id}')" class="btn btn-sm btn-primary" style="white-space:nowrap">＋ 進貨</button>
+      </td>
+    </tr>`;
   }).join('');
+
+  el.innerHTML = `
+    <div class="table-wrap" style="margin-bottom:1.25rem">
+      <table>
+        <thead><tr>
+          <th>商品</th>
+          <th style="text-align:center">當前庫存</th>
+          <th style="text-align:center">總進貨</th>
+          <th style="text-align:center">近30天出貨</th>
+          <th style="text-align:center">日均銷量</th>
+          <th style="text-align:center">預估可售</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function renderStockRecords() {
