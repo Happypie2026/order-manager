@@ -1144,10 +1144,12 @@
 
       <div class="form-grid">
         <div class="form-row" style="margin-bottom:0">
-          <label id="stockQtyLabel">入庫數量 <span style="color:var(--danger)">*</span></label>
+          <label>入庫數量 <span style="color:var(--danger)">*</span></label>
           <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" id="stockQty" placeholder="例：5" min="1" step="1" style="flex:1" oninput="updateStockQtyPreview()">
-            <span id="stockUnitName" style="font-size:13px;color:var(--text2);white-space:nowrap">件</span>
+            <input type="number" id="stockQty" placeholder="數量" min="1" step="1" style="flex:1" oninput="updateStockQtyPreview()">
+            <select id="stockQtyUnit" onchange="updateStockQtyPreview()" style="width:auto;flex-shrink:0">
+              <option value="piece">件</option>
+            </select>
           </div>
           <div id="stockQtyPreview" style="font-size:12px;color:var(--accent);margin-top:4px;font-weight:600"></div>
         </div>
@@ -4293,19 +4295,17 @@ function updateStockUnitInfo() {
   const productId = document.getElementById('stockProductSel').value;
   const p = products.find(x => x.id === productId);
   const infoBox = document.getElementById('stockUnitInfoBox');
-  const unitName = document.getElementById('stockUnitName');
-  const qtyLabel = document.getElementById('stockQtyLabel');
+  const unitSel = document.getElementById('stockQtyUnit');
 
+  // Rebuild unit dropdown
+  unitSel.innerHTML = '<option value="piece">件</option>';
   if (p?.track_stock && p?.stock_unit && p?.stock_unit_qty > 1) {
+    unitSel.add(new Option(p.stock_unit, 'box'));
     infoBox.style.display = 'block';
     document.getElementById('stockUnitInfoText').innerHTML =
-      `📦 入庫單位：<strong>1 ${p.stock_unit} = ${p.stock_unit_qty} 件</strong>　輸入 ${p.stock_unit}數，系統自動換算`;
-    unitName.textContent = p.stock_unit;
-    qtyLabel.innerHTML = `入庫數量（${p.stock_unit}）<span style="color:var(--danger)">*</span>`;
+      `📦 入庫單位：<strong>1 ${p.stock_unit} = ${p.stock_unit_qty} 件</strong>`;
   } else {
     infoBox.style.display = 'none';
-    unitName.textContent = '件';
-    qtyLabel.innerHTML = `入庫數量（件）<span style="color:var(--danger)">*</span>`;
   }
   updateStockQtyPreview();
 }
@@ -4314,9 +4314,10 @@ function updateStockQtyPreview() {
   const productId = document.getElementById('stockProductSel').value;
   const p = products.find(x => x.id === productId);
   const qtyInput = parseInt(document.getElementById('stockQty').value) || 0;
+  const unit = document.getElementById('stockQtyUnit').value;
   const preview = document.getElementById('stockQtyPreview');
 
-  if (p?.stock_unit_qty > 1 && qtyInput > 0) {
+  if (unit === 'box' && p?.stock_unit_qty > 1 && qtyInput > 0) {
     const total = qtyInput * p.stock_unit_qty;
     preview.textContent = `= ${total} 件（${qtyInput} ${p.stock_unit} × ${p.stock_unit_qty} 件）`;
   } else {
@@ -4342,8 +4343,16 @@ function openStockModal(productId, recordId) {
   if (r) {
     const p = products.find(x => x.id === r.product_id);
     const unitQty = p?.stock_unit_qty || 1;
-    document.getElementById('stockQty').value = unitQty > 1 ? Math.round(r.qty / unitQty) : r.qty;
-    updateStockQtyPreview();
+    // If saved with box unit, restore box selection
+    if (r.input_unit && r.input_unit !== '件' && unitQty > 1) {
+      setTimeout(() => {
+        document.getElementById('stockQtyUnit').value = 'box';
+        document.getElementById('stockQty').value = r.input_qty || Math.round(r.qty / unitQty);
+        updateStockQtyPreview();
+      }, 50);
+    } else {
+      document.getElementById('stockQty').value = r.qty;
+    }
   } else {
     document.getElementById('stockQty').value = '';
   }
@@ -4358,8 +4367,9 @@ async function saveStockRecord() {
   if (!qtyInput || qtyInput < 1) { alert('請輸入數量'); return; }
 
   const p = products.find(x => x.id === productId);
-  const unitQty = p?.stock_unit_qty || 1;
-  const actualQty = qtyInput * unitQty; // convert to pieces
+  const unit = document.getElementById('stockQtyUnit').value;
+  const unitQty = (unit === 'box' && p?.stock_unit_qty > 1) ? p.stock_unit_qty : 1;
+  const actualQty = qtyInput * unitQty;
 
   const id = document.getElementById('stockRecordId').value;
   const data = {
