@@ -4411,15 +4411,10 @@ function renderStockRecords() {
 
 function populateStockProductFilter() {
   const sel = document.getElementById('stockProductFilter');
-  const sel2 = document.getElementById('stockProductSel');
-  if (!sel || !sel2) return;
+  if (!sel) return;
   const tracked = products.filter(p => p.track_stock);
   while (sel.options.length > 1) sel.remove(1);
-  while (sel2.options.length > 1) sel2.remove(1);
-  tracked.forEach(p => {
-    sel.add(new Option(`${p.name}（${p.sku}）`, p.id));
-    sel2.add(new Option(`${p.name}（${p.sku}）`, p.id));
-  });
+  tracked.forEach(p => sel.add(new Option(`${p.name}（${p.sku}）`, p.id)));
 }
 
 function updateStockUnitPreview() {
