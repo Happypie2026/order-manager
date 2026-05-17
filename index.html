@@ -2741,12 +2741,15 @@ function renderDashboard() {
 
   // Todo
   const todos = [];
-  const today = new Date().toISOString().slice(0, 10);
+  // Use local date (not UTC) to avoid timezone offset issues
+  const todayLocal = new Date();
+  const today = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth()+1).padStart(2,'0')}-${String(todayLocal.getDate()).padStart(2,'0')}`;
+  const future = new Date(todayLocal); future.setDate(future.getDate() + 30);
+  const twoWeeksLater = `${future.getFullYear()}-${String(future.getMonth()+1).padStart(2,'0')}-${String(future.getDate()).padStart(2,'0')}`;
 
-  // Upcoming arrivals from stock records (next 14 days)
-  const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  // Upcoming arrivals — show all future arrivals (not yet arrived)
   const upcoming = stockRecords.filter(r =>
-    r.arrival_date && r.arrival_date >= today && r.arrival_date <= twoWeeksLater
+    r.arrival_date && !r.arrived && r.arrival_date >= today && r.arrival_date <= twoWeeksLater
   ).sort((a, b) => a.arrival_date.localeCompare(b.arrival_date));
 
   if (upcoming.length > 0) {
@@ -2757,7 +2760,8 @@ function renderDashboard() {
         const unitDisplay = r.input_qty && r.input_unit && r.input_unit !== '件'
           ? `${r.input_qty} ${r.input_unit}（${r.qty} 件）` : `${r.qty} 件`;
         const isToday = r.arrival_date === today;
-        const isTomorrow = r.arrival_date === new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        const tmr = new Date(todayLocal); tmr.setDate(tmr.getDate()+1);
+        const isTomorrow = r.arrival_date === `${tmr.getFullYear()}-${String(tmr.getMonth()+1).padStart(2,'0')}-${String(tmr.getDate()).padStart(2,'0')}`;
         const dateLabel = isToday ? '今天' : isTomorrow ? '明天' : r.arrival_date;
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;border-bottom:1px solid var(--surface2)">
           <div>
