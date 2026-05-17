@@ -518,9 +518,15 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span>業績報表</span>
       </div>
-      <div class="nav-item" onclick="showPage('inventory')">
+      <!-- 庫存管理 (展開式) -->
+      <div class="nav-item nav-item-parent" id="navInventoryParent" onclick="toggleInventoryNav()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
         <span>庫存管理</span>
+        <span class="nav-arrow">▶</span>
+      </div>
+      <div class="nav-submenu" id="navInventorySub">
+        <div class="nav-subitem" id="subInv-records" onclick="showInventoryView('records')">進貨記錄</div>
+        <div class="nav-subitem" id="subInv-stock" onclick="showInventoryView('stock')">當前庫存與銷售速度</div>
       </div>
       <div class="nav-item" onclick="showPage('vendors')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -821,36 +827,43 @@
 
     <!-- Inventory -->
     <div class="page" id="page-inventory">
-      <div class="page-header flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
-        <div>
-          <div class="page-title">庫存管理</div>
-          <div class="page-sub">進貨記錄、當前庫存、銷售速度</div>
+      <!-- View: 進貨記錄 -->
+      <div id="invView-records" style="display:none">
+        <div class="page-header flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+          <div>
+            <div class="page-title">進貨記錄</div>
+            <div class="page-sub">查看所有進貨記錄，新增本次進貨</div>
+          </div>
+          <button class="btn btn-primary" onclick="openStockModal()">＋ 新增進貨</button>
         </div>
-        <button class="btn btn-primary" onclick="openStockModal()">＋ 新增進貨</button>
-      </div>
-
-      <!-- Stock summary cards -->
-      <div id="stockSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:1.5rem"></div>
-
-      <!-- Stock records table -->
-      <div class="card card-pad">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-          <div style="font-size:14px;font-weight:600">進貨記錄</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <select id="stockProductFilter" onchange="renderStockRecords()" style="width:auto">
-              <option value="">全部商品</option>
-            </select>
-            <input type="month" id="stockMonthFilter" onchange="renderStockRecords()" style="width:auto">
+        <div class="card card-pad">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+            <div style="font-size:14px;font-weight:600">進貨記錄</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <select id="stockProductFilter" onchange="renderStockRecords()" style="width:auto">
+                <option value="">全部商品</option>
+              </select>
+              <input type="month" id="stockMonthFilter" onchange="renderStockRecords()" style="width:auto">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>日期</th><th>商品</th><th>進貨數量</th><th>進貨成本</th><th>備註</th><th>操作</th>
+              </tr></thead>
+              <tbody id="stockRecordsBody"></tbody>
+            </table>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>日期</th><th>商品</th><th>進貨數量</th><th>進貨成本</th><th>備註</th><th>操作</th>
-            </tr></thead>
-            <tbody id="stockRecordsBody"></tbody>
-          </table>
+      </div>
+
+      <!-- View: 當前庫存與銷售速度 -->
+      <div id="invView-stock" style="display:none">
+        <div class="page-header">
+          <div class="page-title">當前庫存與銷售速度</div>
+          <div class="page-sub">各商品即時庫存量、近30天銷售速度與預估可售天數</div>
         </div>
+        <div id="stockSummaryCards"></div>
       </div>
     </div>
 
@@ -2190,6 +2203,31 @@ function showHoldingAreaView(haId) {
   showPage('orders');
 }
 
+let _inventoryNavOpen = false;
+let _currentInventoryView = 'records';
+
+function toggleInventoryNav() {
+  _inventoryNavOpen = !_inventoryNavOpen;
+  document.getElementById('navInventoryParent').classList.toggle('open', _inventoryNavOpen);
+  document.getElementById('navInventorySub').classList.toggle('open', _inventoryNavOpen);
+  if (_inventoryNavOpen) showInventoryView(_currentInventoryView);
+}
+
+function showInventoryView(view) {
+  _currentInventoryView = view;
+  _inventoryNavOpen = true;
+  document.getElementById('navInventoryParent').classList.add('open', 'active');
+  document.getElementById('navInventorySub').classList.add('open');
+
+  ['records','stock'].forEach(v => {
+    document.getElementById(`subInv-${v}`)?.classList.toggle('active', v === view);
+    const el = document.getElementById(`invView-${v}`);
+    if (el) el.style.display = v === view ? 'block' : 'none';
+  });
+
+  showPage('inventory');
+}
+
 // ==================== MOBILE NAV ====================
 function setMobileNav(id) {
   document.querySelectorAll('.mnav-item').forEach(el => el.classList.remove('active'));
@@ -2491,7 +2529,11 @@ function showPage(id) {
   if (id === 'mapping') renderMappingCards();
   if (id === 'vendors') renderVendors();
   if (id === 'products') { populateProductVendorFilter(); renderProducts(); }
-  if (id === 'inventory') { populateStockProductFilter(); renderStockSummary(); renderStockRecords(); }
+  if (id === 'inventory') {
+    populateStockProductFilter();
+    if (_currentInventoryView === 'records') renderStockRecords();
+    else renderStockSummary();
+  }
 }
 
 // ==================== DASHBOARD ====================
@@ -5680,7 +5722,7 @@ create policy "Allow all" on orders for all using (true) with check (true);`;
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       廠商
     </div>
-    <div class="mnav-item" id="mnav-inventory" onclick="showPage('inventory');setMobileNav('inventory')">
+    <div class="mnav-item" id="mnav-inventory" onclick="showInventoryView('records');setMobileNav('inventory')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
       庫存
     </div>
