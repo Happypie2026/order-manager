@@ -264,12 +264,136 @@
   input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
   .hidden { display: none !important; }
   @media (max-width: 768px) {
-    .sidebar { width: 48px; }
-    .logo-texts, .nav-section, .nav-item span:not(.nav-badge), .nav-badge { display: none; }
-    .nav-item { padding: 0.5rem 0; justify-content: center; }
-    .main { margin-left: 48px; }
+    /* Hide desktop sidebar */
+    .sidebar { display: none !important; }
+    .main { margin-left: 0 !important; padding-bottom: 70px; }
+    .main.collapsed { margin-left: 0 !important; }
+
+    /* Page padding for mobile */
+    .page { padding: 1rem; max-width: 100%; }
+    .page-header { flex-direction: column; align-items: flex-start !important; gap: 8px; }
+    .page-title { font-size: 16px; }
+    .btn-row { flex-wrap: wrap; width: 100%; }
+    .btn-row .btn { flex: 1; min-width: 120px; justify-content: center; }
+
+    /* Forms */
     .form-grid { grid-template-columns: 1fr; }
     .grid-2 { grid-template-columns: 1fr; }
+
+    /* Filters — stack vertically */
+    .filters { flex-direction: column; gap: 8px; }
+    .filters select, .filters .search-wrap { width: 100%; }
+
+    /* Platform tabs — scroll horizontally */
+    .plat-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+    .plat-tab { white-space: nowrap; flex-shrink: 0; }
+
+    /* Table → card view */
+    .table-wrap table { display: block; }
+    .table-wrap thead { display: none; }
+    .table-wrap tbody { display: flex; flex-direction: column; gap: 10px; }
+    .table-wrap tr { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .table-wrap td { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; border: none; }
+    .table-wrap td:before { content: attr(data-label); font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; min-width: 70px; }
+    .table-wrap td:first-child { display: none; } /* hide checkbox on mobile */
+    .table-wrap td:last-child { justify-content: flex-end; gap: 6px; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 8px; }
+    .table-wrap td:last-child:before { display: none; }
+
+    /* Batch bar — compact */
+    #batchBar { flex-wrap: wrap; gap: 6px; }
+    #batchActions { width: 100%; flex-wrap: wrap; gap: 4px; }
+    #batchActions .btn { flex: 1; min-width: 80px; font-size: 11px; padding: 5px 6px; }
+    #batchStatusSel { width: 100%; }
+
+    /* Modal full screen on mobile */
+    .modal-overlay .modal { width: 100% !important; max-width: 100%; max-height: 95vh; margin: auto 0 0; border-radius: var(--radius) var(--radius) 0 0; }
+
+    /* Drawer full width */
+    #detailDrawer { width: 100% !important; right: -100% !important; }
+    #detailDrawer.open-mobile { right: 0 !important; }
+
+    /* Stats row */
+    .stats-row { grid-template-columns: 1fr 1fr; }
+
+    /* Login screen */
+    #loginScreen > div { width: 95vw; }
+
+    /* Export type grid */
+    #exportTypeGrid { grid-template-columns: 1fr 1fr; }
+
+    /* Holding area batch bar */
+    .batchHoldOptions { flex-direction: column; }
+  }
+
+  /* Bottom nav (mobile only) */
+  #mobileNav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--text);
+    z-index: 200;
+    height: 60px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #mobileNav .mobile-nav-inner {
+    display: flex;
+    height: 100%;
+    min-width: max-content;
+    padding: 0 4px;
+  }
+  #mobileNav .mnav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 14px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.5);
+    font-size: 10px;
+    white-space: nowrap;
+    transition: color 0.15s;
+    min-width: 60px;
+    border-top: 2px solid transparent;
+  }
+  #mobileNav .mnav-item svg { width: 20px; height: 20px; opacity: 0.7; }
+  #mobileNav .mnav-item.active { color: #fff; border-top-color: var(--accent-mid); }
+  #mobileNav .mnav-item.active svg { opacity: 1; }
+  #mobileNav .mnav-item:hover { color: rgba(255,255,255,0.85); }
+
+  /* Mobile orders sub-menu sheet */
+  #mobileOrdersSheet {
+    display: none;
+    position: fixed;
+    bottom: 60px; left: 0; right: 0;
+    background: var(--text);
+    z-index: 199;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding: 8px 0;
+  }
+  #mobileOrdersSheet .msheet-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px;
+    color: rgba(255,255,255,0.65);
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #mobileOrdersSheet .msheet-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  #mobileOrdersSheet .msheet-item.active { color: #fff; font-weight: 600; }
+  #mobileOrdersSheet .msheet-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 0; }
+  #mobileOrdersSheetOverlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 198;
+  }
+
+  @media (max-width: 768px) {
+    #mobileNav { display: flex; }
+    .sidebar-toggle { display: none; }
   }
 
   /* Searchable Select */
@@ -1911,6 +2035,7 @@ function updateNavHoldingAreas() {
     <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
       ${ha.locked ? '🔒 ' : ''}${ha.name}
     </div>`).join('');
+  updateMobileHoldingAreas();
 }
 
 function showHoldingAreaView(haId) {
@@ -1922,6 +2047,39 @@ function showHoldingAreaView(haId) {
   const statusSel = document.getElementById('orderStatusFilter');
   if (statusSel) statusSel.value = '';
   showPage('orders');
+}
+
+// ==================== MOBILE NAV ====================
+function setMobileNav(id) {
+  document.querySelectorAll('.mnav-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(`mnav-${id}`);
+  if (el) el.classList.add('active');
+}
+
+function toggleMobileOrdersSheet() {
+  const sheet = document.getElementById('mobileOrdersSheet');
+  const overlay = document.getElementById('mobileOrdersSheetOverlay');
+  const isOpen = sheet.style.display === 'block';
+  sheet.style.display = isOpen ? 'none' : 'block';
+  overlay.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    document.getElementById('mnav-orders').classList.add('active');
+    document.querySelectorAll('.mnav-item:not(#mnav-orders)').forEach(el => el.classList.remove('active'));
+  }
+}
+
+function closeMobileOrdersSheet() {
+  document.getElementById('mobileOrdersSheet').style.display = 'none';
+  document.getElementById('mobileOrdersSheetOverlay').style.display = 'none';
+}
+
+function updateMobileHoldingAreas() {
+  const el = document.getElementById('mobileHoldingAreaItems');
+  if (!el) return;
+  el.innerHTML = holdingAreas.map(ha => `
+    <div class="msheet-item" onclick="showHoldingAreaView('${ha.id}');closeMobileOrdersSheet()">
+      ${ha.locked ? '🔒 ' : '📂 '}${ha.name}
+    </div>`).join('');
 }
 
 // ==================== SIDEBAR TOGGLE ====================
@@ -2182,7 +2340,10 @@ function showPage(id) {
     document.getElementById('navOrdersParent')?.classList.add('active');
   }
 
-  if (id === 'dashboard') renderDashboard();
+  // Sync mobile nav
+  if (id === 'orders') setMobileNav('orders');
+  else setMobileNav(id);
+  closeMobileOrdersSheet();
   if (id === 'orders') { populateOrderVendorFilter(); renderHoldingAreas(); renderOrderPlatTabs(); renderOrders(); }
   if (id === 'report') renderReport();
   if (id === 'mapping') renderMappingCards();
@@ -2910,22 +3071,19 @@ function renderOrders() {
           : (o.product_name ? `<span title="${o.product_name}">${o.product_name.slice(0,16)}${o.product_name.length>16?'…':''}</span>` : '<span style="color:var(--text3)">-</span>');
 
         return `<tr style="background:${rowBg}">
-          <td>${isLocked
-            ? `<span title="🔒 ${ha.name}（已鎖定）" style="font-size:14px;cursor:default">🔒</span>`
-            : `<input type="checkbox" ${selectedOrders.has(o.id)?'checked':''} onchange="toggleSelect('${o.id}',this)" style="accent-color:var(--accent)">`
-          }</td>
-          <td class="mono" style="font-size:12px">
+          <td><input type="checkbox" ${selectedOrders.has(o.id)?'checked':''} onchange="toggleSelect('${o.id}',this)" style="accent-color:var(--accent)"></td>
+          <td data-label="訂單編號" class="mono" style="font-size:12px">
             ${o.order_id}
             ${isMergedPrimary ? `<div style="font-size:10px;color:var(--success);font-weight:700;margin-top:1px">🔗 已合併 ${(o.merged_from?.length||0)+1} 筆</div>` : ''}
             ${ha ? `<div style="font-size:10px;margin-top:2px;color:${ha.locked?'#b45309':'var(--info)'}">📌 ${ha.name}</div>` : ''}
           </td>
-          <td>${platTag(o.platform)}</td>
-          <td>${o.buyer_name||'-'}</td>
-          <td style="font-size:12px;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${productDisplay}</td>
-          <td style="font-weight:500">$${(o.amount||0).toLocaleString()}</td>
-          <td>${statusPill(o.status)}</td>
-          <td style="font-size:12px;color:var(--text2)">${fmtDate(o.order_date||o.created_at)}</td>
-          <td style="white-space:nowrap">
+          <td data-label="平台">${platTag(o.platform)}</td>
+          <td data-label="買家">${o.buyer_name||'-'}</td>
+          <td data-label="商品" style="font-size:12px;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${productDisplay}</td>
+          <td data-label="金額" style="font-weight:500">$${(o.amount||0).toLocaleString()}</td>
+          <td data-label="狀態">${statusPill(o.status)}</td>
+          <td data-label="時間" style="font-size:12px;color:var(--text2)">${fmtDate(o.order_date||o.created_at)}</td>
+          <td>
             <button class="btn btn-sm" onclick="openDrawer('${o.id}')" style="margin-right:3px">詳情</button>
             <button class="btn btn-sm" onclick="openEditModal('${o.id}')" style="margin-right:3px">編輯</button>
             <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">刪除</button>
@@ -3492,11 +3650,13 @@ function openDrawer(id) {
 
   document.getElementById('drawerBody').innerHTML = html;
   document.getElementById('detailDrawer').style.right = '0';
+  document.getElementById('detailDrawer').classList.add('open-mobile');
   document.getElementById('drawerOverlay').style.display = 'block';
 }
 
 function closeDrawer() {
   document.getElementById('detailDrawer').style.right = '-560px';
+  document.getElementById('detailDrawer').classList.remove('open-mobile');
   document.getElementById('drawerOverlay').style.display = 'none';
   drawerOrderId = null;
   // Reset edit mode
@@ -5005,5 +5165,52 @@ create table if not exists orders (
 alter table orders enable row level security;
 create policy "Allow all" on orders for all using (true) with check (true);`;
 </script>
+<!-- Mobile Bottom Nav -->
+<div id="mobileOrdersSheetOverlay" onclick="closeMobileOrdersSheet()"></div>
+<div id="mobileOrdersSheet">
+  <div class="msheet-item active" id="msheet-active" onclick="showOrdersView('active');closeMobileOrdersSheet()">📋 訂單列表</div>
+  <div class="msheet-item" id="msheet-shipped" onclick="showOrdersView('shipped');closeMobileOrdersSheet()">🚚 已出貨訂單</div>
+  <div class="msheet-item" id="msheet-cancelled" onclick="showOrdersView('cancelled');closeMobileOrdersSheet()">❌ 已取消訂單</div>
+  <div class="msheet-divider"></div>
+  <div class="msheet-item" id="msheet-holding" onclick="showOrdersView('holding');closeMobileOrdersSheet()">📌 訂單暫存區</div>
+  <div id="mobileHoldingAreaItems"></div>
+  <div style="padding:8px 20px">
+    <button onclick="openHoldingAreaModal();closeMobileOrdersSheet()" style="background:none;border:1.5px dashed rgba(255,255,255,0.2);color:rgba(255,255,255,0.4);padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;width:100%;text-align:left">＋ 新增暫存區</button>
+  </div>
+</div>
+
+<nav id="mobileNav">
+  <div class="mobile-nav-inner">
+    <div class="mnav-item active" id="mnav-dashboard" onclick="showPage('dashboard');setMobileNav('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      總覽
+    </div>
+    <div class="mnav-item" id="mnav-orders" onclick="toggleMobileOrdersSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      訂單
+    </div>
+    <div class="mnav-item" id="mnav-import" onclick="showPage('import');setMobileNav('import')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      匯入
+    </div>
+    <div class="mnav-item" id="mnav-vendors" onclick="showPage('vendors');setMobileNav('vendors')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      廠商
+    </div>
+    <div class="mnav-item" id="mnav-products" onclick="showPage('products');setMobileNav('products')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+      商品
+    </div>
+    <div class="mnav-item" id="mnav-report" onclick="showPage('report');setMobileNav('report')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      報表
+    </div>
+    <div class="mnav-item" id="mnav-settings" onclick="showPage('settings');setMobileNav('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 18.66l-1.41 1.41M12 2v2M12 20v2M4.93 4.93l1.41 1.41M18.66 18.66l1.41 1.41M2 12h2M20 12h2"/></svg>
+      設定
+    </div>
+  </div>
+</nav>
+
 </body>
 </html>
