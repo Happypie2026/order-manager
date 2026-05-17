@@ -1021,7 +1021,7 @@
         </div>
         <div class="table-wrap" style="margin-bottom:1rem;border:none;border-radius:0">
           <table style="font-size:13px">
-            <thead><tr><th>帳號</th><th>備註</th><th>操作</th></tr></thead>
+            <thead><tr><th>帳號</th><th>權限</th><th>備註</th><th>操作</th></tr></thead>
             <tbody id="accountsBody"></tbody>
           </table>
         </div>
@@ -1418,6 +1418,42 @@
       <div class="form-row">
         <label>備註（選填）</label>
         <input type="text" id="accNote" placeholder="例：客服組、倉管">
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>頁面權限</label>
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="dashboard" style="accent-color:var(--accent)"> 總覽儀表板
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="report" style="accent-color:var(--accent)"> 業績報表
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="inventory" style="accent-color:var(--accent)"> 庫存管理
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="products" style="accent-color:var(--accent)"> 商品管理
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="import" style="accent-color:var(--accent)"> 匯入訂單
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="orders" style="accent-color:var(--accent)"> 訂單管理
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="vendors" style="accent-color:var(--accent)"> 廠商管理
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="mapping" style="accent-color:var(--accent)"> 欄位對應設定
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" class="acc-perm" value="settings" style="accent-color:var(--accent)"> 系統設定
+          </label>
+        </div>
+        <div style="margin-top:6px;display:flex;gap:8px">
+          <button type="button" onclick="setAllPerms(true)" class="btn btn-sm">全選</button>
+          <button type="button" onclick="setAllPerms(false)" class="btn btn-sm">全清</button>
+        </div>
       </div>
       <input type="hidden" id="accId">
     </div>
@@ -1971,6 +2007,7 @@ const PER_PAGE = 15;
 // ==================== AUTH / LOGIN (Supabase) ====================
 let currentUser     = sessionStorage.getItem('currentUser') || null;
 let currentUserNote = sessionStorage.getItem('currentUserNote') || '';
+let currentUserRole = sessionStorage.getItem('currentUserRole') || 'staff';
 
 // SHA-256 hash using Web Crypto API — matches Supabase SQL: encode(digest('user::pass','sha256'),'hex')
 async function sha256Hex(str) {
@@ -2003,7 +2040,7 @@ async function doLogin() {
     const hash = await sha256Hex(user + '::' + pass);
 
     const res = await fetch(
-      `${sbUrl}/rest/v1/accounts?username=eq.${encodeURIComponent(user)}&pass_hash=eq.${hash}&select=id,username,note`,
+      `${sbUrl}/rest/v1/accounts?username=eq.${encodeURIComponent(user)}&pass_hash=eq.${hash}&select=id,username,note,role,permissions`,
       { headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey } }
     );
 
@@ -2015,11 +2052,21 @@ async function doLogin() {
       const found = rows[0];
       currentUser     = found.username;
       currentUserNote = found.note || '';
+      currentUserRole = found.role || 'staff';
+      // permissions column takes priority; fall back to role-based defaults
+      currentUserPerms = found.permissions?.length
+        ? found.permissions
+        : found.role === 'admin' ? ALL_PAGES
+        : found.role === 'supervisor' ? ['dashboard','report','inventory']
+        : ['dashboard','import','orders'];
       sessionStorage.setItem('currentUser', currentUser);
       sessionStorage.setItem('currentUserNote', currentUserNote);
+      sessionStorage.setItem('currentUserRole', currentUserRole);
+      sessionStorage.setItem('currentUserPerms', JSON.stringify(currentUserPerms));
       document.getElementById('loginScreen').style.display = 'none';
       const info = document.getElementById('sidebarUserInfo');
       if (info) info.textContent = '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
+      applyRolePermissions();
       document.getElementById('loginUser').value = '';
       document.getElementById('loginPass').value = '';
     } else {
@@ -2055,17 +2102,87 @@ function toggleLoginPw() {
 }
 
 function checkAuth() {
-  // Clear any legacy localStorage accounts (now stored in Supabase)
   localStorage.removeItem('accounts');
   loadSettings();
   if (currentUser) {
     document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('sidebarUserInfo').textContent =
-      '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
+    const info = document.getElementById('sidebarUserInfo');
+    if (info) info.textContent = '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
+    applyRolePermissions();
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     setTimeout(() => document.getElementById('loginUser')?.focus(), 100);
   }
+}
+
+// ==================== ROLE PERMISSIONS ====================
+let currentUserPerms = JSON.parse(sessionStorage.getItem('currentUserPerms') || '["dashboard","orders","import"]');
+
+const ALL_PAGES = ['dashboard','report','inventory','products','import','orders','vendors','mapping','settings'];
+
+function canAccess(page) {
+  if (!currentUser) return false;
+  return currentUserPerms.includes(page);
+}
+
+function applyRolePermissions() {
+  // Update sidebar user info
+  const info = document.getElementById('sidebarUserInfo');
+  if (info) info.textContent = '👤 ' + currentUser + (currentUserNote ? '（' + currentUserNote + '）' : '');
+
+  // Nav visibility map: page → selectors to show/hide
+  const navMap = {
+    report:    () => ['[onclick*="\'report\'"]'],
+    inventory: () => ['#navInventoryParent','#navInventorySub'],
+    products:  () => ['[onclick*="\'products\'"]'],
+    import:    () => ['[onclick*="\'import\'"]'],
+    vendors:   () => ['[onclick*="\'vendors\'"]'],
+    mapping:   () => ['[onclick*="\'mapping\'"]'],
+    settings:  () => ['[onclick*="\'settings\'"]'],
+    orders:    () => ['#navOrdersParent','#navOrdersSub'],
+  };
+
+  const mobileMap = {
+    report:    '#mnav-report',
+    inventory: '#mnav-inventory',
+    products:  '#mnav-products',
+    vendors:   '#mnav-vendors',
+    settings:  '#mnav-settings',
+    import:    '#mnav-import',
+    orders:    '#mnav-orders',
+  };
+
+  Object.entries(navMap).forEach(([page, getSelectors]) => {
+    const show = canAccess(page);
+    getSelectors().forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => el.style.display = show ? '' : 'none');
+    });
+  });
+
+  Object.entries(mobileMap).forEach(([page, sel]) => {
+    const el = document.querySelector(sel);
+    if (el) el.style.display = canAccess(page) ? '' : 'none';
+  });
+
+  // Redirect if on unauthorized page
+  if (currentPage && !canAccess(currentPage)) {
+    const firstAllowed = ALL_PAGES.find(p => canAccess(p)) || 'dashboard';
+    _origShowPage(firstAllowed);
+  }
+}
+
+// Guard showPage
+const _origShowPage = showPage;
+function showPage(id) {
+  if (currentUser && !canAccess(id)) {
+    alert('您沒有權限存取此頁面');
+    return;
+  }
+  _origShowPage(id);
+}
+
+function setAllPerms(val) {
+  document.querySelectorAll('.acc-perm').forEach(cb => cb.checked = val);
 }
 
 // ==================== ACCOUNT MANAGEMENT (Supabase) ====================
@@ -2094,14 +2211,21 @@ async function renderAccounts() {
       return;
     }
 
-    tbody.innerHTML = _sbAccounts.map(a => `<tr>
-      <td style="font-weight:500">${a.username}</td>
-      <td style="color:var(--text2);font-size:12.5px">${a.note || '-'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-sm" onclick="openAccountModal('${a.id}')" style="margin-right:4px">編輯</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteAccount('${a.id}')">刪除</button>
-      </td>
-    </tr>`).join('');
+    const PAGE_LABELS = {dashboard:'總覽',report:'業績',inventory:'庫存',products:'商品',import:'匯入',orders:'訂單',vendors:'廠商',mapping:'欄位',settings:'設定'};
+    tbody.innerHTML = _sbAccounts.map(a => {
+      const perms = a.permissions || [];
+      const isAll = ALL_PAGES.every(p => perms.includes(p));
+      const permText = isAll ? '全部功能' : perms.map(p => PAGE_LABELS[p]||p).join('、') || '無';
+      return `<tr>
+        <td style="font-weight:500">${a.username}</td>
+        <td style="font-size:12px;color:var(--text2);max-width:200px">${permText}</td>
+        <td style="color:var(--text2);font-size:12.5px">${a.note || '-'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" onclick="openAccountModal('${a.id}')" style="margin-right:4px">編輯</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteAccount('${a.id}')">刪除</button>
+        </td>
+      </tr>`;
+    }).join('');
   } catch(e) {
     tbody.innerHTML = `<tr><td colspan="3" style="color:var(--danger);padding:1rem">載入失敗：${e.message}</td></tr>`;
   }
@@ -2115,6 +2239,11 @@ function openAccountModal(id) {
   document.getElementById('accPass2').value = '';
   document.getElementById('accNote').value  = a?.note || '';
   document.getElementById('accId').value    = a?.id || '';
+  // Set permission checkboxes
+  const perms = a?.permissions || (a ? [] : ALL_PAGES); // new account defaults to all
+  document.querySelectorAll('.acc-perm').forEach(cb => {
+    cb.checked = perms.includes(cb.value);
+  });
   document.getElementById('accountModal').classList.add('show');
   setTimeout(() => document.getElementById('accUser').focus(), 100);
 }
@@ -2125,6 +2254,7 @@ async function saveAccount() {
   const pass2 = document.getElementById('accPass2').value;
   const note  = document.getElementById('accNote').value.trim();
   const id    = document.getElementById('accId').value;
+  const permissions = [...document.querySelectorAll('.acc-perm:checked')].map(cb => cb.value);
 
   if (!user) { alert('請輸入帳號'); return; }
   if (!id && !pass) { alert('請輸入密碼'); return; }
@@ -2137,7 +2267,7 @@ async function saveAccount() {
   try {
     if (id) {
       // Update
-      const body = { username: user, note };
+      const body = { username: user, note, permissions };
       if (pass) body.pass_hash = await sha256Hex(user + '::' + pass);
       const res = await fetch(`${settings.sbUrl}/rest/v1/accounts?id=eq.${id}`, {
         method: 'PATCH',
@@ -2153,7 +2283,7 @@ async function saveAccount() {
         method: 'POST',
         headers: { apikey: settings.sbKey, Authorization: 'Bearer ' + settings.sbKey,
           'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ id: generateId(), username: user, pass_hash: hash, note }),
+        body: JSON.stringify({ id: generateId(), username: user, pass_hash: hash, note, permissions }),
       });
       if (!res.ok) {
         const errText = await res.text();
