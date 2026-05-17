@@ -856,7 +856,7 @@
           <div class="table-wrap stock-table-wrap">
             <table>
               <thead><tr>
-                <th>日期</th><th>商品</th><th>進貨數量</th><th>進貨成本</th><th>備註</th><th>操作</th>
+                <th>到貨日期</th><th>商品</th><th>進貨數量</th><th>備註</th><th>操作</th>
               </tr></thead>
               <tbody id="stockRecordsBody"></tbody>
             </table>
@@ -1146,6 +1146,20 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('productModal')">取消</button>
       <button class="btn btn-primary" onclick="saveProduct()">儲存商品</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stock Detail Modal -->
+<div class="modal-overlay" id="stockDetailModal">
+  <div class="modal" style="width:440px">
+    <div class="modal-header">
+      <div class="modal-title">進貨詳情</div>
+      <button class="modal-close" onclick="closeModal('stockDetailModal')">×</button>
+    </div>
+    <div class="modal-body" id="stockDetailBody"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('stockDetailModal')">關閉</button>
     </div>
   </div>
 </div>
@@ -4316,17 +4330,17 @@ function renderStockRecords() {
       : `+${r.qty} 件`;
     return `<tr>
       <td data-label="日期" style="font-size:13px">
-        <div>${r.record_date || '-'}</div>
-        ${r.arrival_date ? `<div style="font-size:11px;color:var(--text3)">到貨：${r.arrival_date}</div>` : ''}
+        <div style="font-weight:500">${r.arrival_date || '-'}</div>
+        <div style="font-size:11px;color:var(--text3)">下單：${r.record_date || '-'}</div>
       </td>
       <td data-label="商品">
         <div style="font-weight:500;font-size:13px">${p?.name || '未知商品'}</div>
         ${p?.sku ? `<div style="font-size:11px;color:var(--text3)">${p.sku}</div>` : ''}
       </td>
       <td data-label="進貨數量" style="font-weight:600;color:var(--success)">${unitDisplay}</td>
-      <td data-label="進貨成本" style="font-size:13px">${r.unit_cost ? `$${r.unit_cost}/件（共 $${totalCost.toLocaleString()}）` : '-'}</td>
       <td data-label="備註" style="font-size:12.5px;color:var(--text2)">${r.note || '-'}</td>
       <td>
+        <button class="btn btn-sm" onclick="openStockDetail('${r.id}')" style="margin-right:4px">詳情</button>
         <button class="btn btn-sm" onclick="openStockModal(null,'${r.id}')" style="margin-right:4px">編輯</button>
         <button class="btn btn-sm btn-danger" onclick="deleteStockRecord('${r.id}')">刪除</button>
       </td>
@@ -4420,6 +4434,51 @@ function openStockModal(productId, recordId) {
   }
 
   document.getElementById('stockModal').classList.add('show');
+}
+
+function openStockDetail(id) {
+  const r = stockRecords.find(x => x.id === id);
+  if (!r) return;
+  const p = products.find(x => x.id === r.product_id);
+  const v = vendors.find(x => x.id === p?.vendor_id);
+  const unitDisplay = r.input_qty && r.input_unit && r.input_unit !== '件'
+    ? `${r.qty} 件（${r.input_qty} ${r.input_unit}）`
+    : `${r.qty} 件`;
+  const totalCost = (r.qty || 0) * (r.unit_cost || 0);
+
+  document.getElementById('stockDetailBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">商品</div>
+        <div style="font-weight:700;font-size:15px">${p?.name || '未知商品'}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${p?.sku || ''}${v ? ' · ' + v.name : ''}</div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">到貨日期</div>
+          <div style="font-weight:600">${r.arrival_date || '未設定'}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">下單日期</div>
+          <div style="font-weight:600">${r.record_date || '-'}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">進貨數量</div>
+          <div style="font-weight:600;color:var(--success)">${unitDisplay}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">進貨成本</div>
+          <div style="font-weight:600">${r.unit_cost ? `$${r.unit_cost} / 件` : '未填寫'}</div>
+          ${r.unit_cost ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">合計 $${totalCost.toLocaleString()}</div>` : ''}
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">備註</div>
+        <div style="font-size:13px;color:${r.note ? 'var(--text)' : 'var(--text3)'}">${r.note || '無'}</div>
+      </div>
+    </div>`;
+  document.getElementById('stockDetailModal').classList.add('show');
 }
 
 async function saveStockRecord() {
