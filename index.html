@@ -830,7 +830,7 @@
       <div class="card card-pad mb-3">
         <div class="card-title">🔐 帳號管理</div>
         <div class="alert alert-info" style="margin-bottom:1rem;font-size:13px">
-          帳號密碼儲存在本機瀏覽器，僅供存取保護使用。所有帳號共用同一份訂單資料。
+          帳號密碼儲存在 Supabase 資料庫，所有裝置共用同一組帳號。
         </div>
         <div class="table-wrap" style="margin-bottom:1rem;border:none;border-radius:0">
           <table style="font-size:13px">
@@ -1729,7 +1729,8 @@ function toggleLoginPw() {
 }
 
 function checkAuth() {
-  // Make sure settings are loaded before showing login
+  // Clear any legacy localStorage accounts (now stored in Supabase)
+  localStorage.removeItem('accounts');
   loadSettings();
   if (currentUser) {
     document.getElementById('loginScreen').style.display = 'none';
@@ -1828,7 +1829,11 @@ async function saveAccount() {
           'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ id: generateId(), username: user, pass_hash: hash, note }),
       });
-      if (!res.ok) throw new Error('新增失敗');
+      if (!res.ok) {
+        const errText = await res.text();
+        if (errText.includes('unique') || errText.includes('duplicate')) throw new Error(`帳號「${user}」已存在`);
+        throw new Error(`新增失敗 (${res.status}): ${errText}`);
+      }
     }
     closeModal('accountModal');
     renderAccounts();
