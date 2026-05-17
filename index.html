@@ -555,8 +555,7 @@
         <div class="page-title">總覽儀表板</div>
         <div class="page-sub">所有平台訂單整合概況</div>
       </div>
-      <!-- Stock alert banner -->
-      <div id="stockAlertBanner" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:1rem;font-size:13px;color:#b91c1c"></div>
+      <!-- Stock alert banner removed -->
       <div class="stats-row" id="dashStats"></div>
       <div class="grid-2 mb-3">
         <div class="card card-pad">
@@ -2488,7 +2487,6 @@ function showPage(id) {
 
 // ==================== DASHBOARD ====================
 function renderDashboard() {
-  renderStockAlert();
   const valid = orders.filter(o => o.status !== 'cancelled');
   const revenue = valid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
   const pending = orders.filter(o => o.status === 'pending').length;
