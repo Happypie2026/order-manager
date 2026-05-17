@@ -1092,10 +1092,25 @@
         <div style="font-size:12px;color:var(--text3)">啟用後可記錄進貨、追蹤庫存量</div>
       </div>
       <div id="stockAlertWrap" style="display:none">
-        <div class="form-row" style="margin-bottom:0">
-          <label>庫存警示數量</label>
-          <input type="number" id="productStockAlert" placeholder="例：10" min="0" step="1" style="width:120px">
-          <div style="font-size:11.5px;color:var(--text3);margin-top:4px">庫存低於此數量時，儀表板顯示警示</div>
+        <div class="form-grid" style="margin-bottom:0">
+          <div class="form-row" style="margin-bottom:0">
+            <label>庫存警示數量（件）</label>
+            <input type="number" id="productStockAlert" placeholder="例：10" min="0" step="1">
+            <div style="font-size:11.5px;color:var(--text3);margin-top:4px">低於此數量時顯示警示</div>
+          </div>
+          <div class="form-row" style="margin-bottom:0">
+            <label>入庫單位名稱</label>
+            <input type="text" id="productStockUnit" placeholder="例：箱、打、組">
+            <div style="font-size:11.5px;color:var(--text3);margin-top:4px">大包裝單位名稱</div>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:0.75rem;margin-bottom:0">
+          <label>1 <span id="stockUnitPreview" style="color:var(--accent);font-weight:600">箱</span> = 幾件</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" id="productStockUnitQty" placeholder="例：24" min="1" step="1" style="width:100px" oninput="updateStockUnitPreview()">
+            <span style="font-size:13px;color:var(--text2)">件 / <span id="stockUnitPreview2" style="color:var(--accent)">箱</span></span>
+          </div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:4px">入庫時輸入箱數，系統自動換算總件數</div>
         </div>
       </div>
       <input type="hidden" id="productId">
@@ -1117,29 +1132,48 @@
     <div class="modal-body">
       <div class="form-row">
         <label>商品 <span style="color:var(--danger)">*</span></label>
-        <select id="stockProductSel" style="width:100%">
+        <select id="stockProductSel" style="width:100%" onchange="updateStockUnitInfo()">
           <option value="">— 選擇商品 —</option>
         </select>
       </div>
+
+      <!-- Unit info box (shows when product has unit setting) -->
+      <div id="stockUnitInfoBox" style="display:none;background:var(--accent-light);border:1px solid var(--accent-mid);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:1rem;font-size:13px">
+        <span id="stockUnitInfoText"></span>
+      </div>
+
       <div class="form-grid">
         <div class="form-row" style="margin-bottom:0">
-          <label>進貨數量 <span style="color:var(--danger)">*</span></label>
-          <input type="number" id="stockQty" placeholder="例：100" min="1" step="1">
+          <label id="stockQtyLabel">入庫數量 <span style="color:var(--danger)">*</span></label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="stockQty" placeholder="例：5" min="1" step="1" style="flex:1" oninput="updateStockQtyPreview()">
+            <span id="stockUnitName" style="font-size:13px;color:var(--text2);white-space:nowrap">件</span>
+          </div>
+          <div id="stockQtyPreview" style="font-size:12px;color:var(--accent);margin-top:4px;font-weight:600"></div>
         </div>
         <div class="form-row" style="margin-bottom:0">
           <label>進貨成本（每件）</label>
           <input type="number" id="stockUnitCost" placeholder="例：250" min="0" step="1">
         </div>
       </div>
-      <div class="form-row">
-        <label>進貨日期</label>
-        <input type="date" id="stockDate">
+
+      <div class="form-grid" style="margin-top:0.75rem">
+        <div class="form-row" style="margin-bottom:0">
+          <label>進貨日期</label>
+          <input type="date" id="stockDate">
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label>預計到貨日期</label>
+          <input type="date" id="stockArrivalDate">
+        </div>
       </div>
-      <div class="form-row">
+
+      <div class="form-row" style="margin-top:0.75rem">
         <label>備註</label>
         <input type="text" id="stockNote" placeholder="例：第一批進貨、促銷備貨…">
       </div>
       <input type="hidden" id="stockRecordId">
+      <input type="hidden" id="stockActualQty">
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('stockModal')">取消</button>
@@ -4213,16 +4247,22 @@ function renderStockRecords() {
   body.innerHTML = filtered.map(r => {
     const p = products.find(x => x.id === r.product_id);
     const totalCost = (r.qty || 0) * (r.unit_cost || 0);
+    const unitDisplay = r.input_qty && r.input_unit && r.input_unit !== '件'
+      ? `+${r.qty} 件（${r.input_qty} ${r.input_unit}）`
+      : `+${r.qty} 件`;
     return `<tr>
-      <td style="font-size:13px">${r.record_date || '-'}</td>
-      <td>
+      <td data-label="日期" style="font-size:13px">
+        <div>${r.record_date || '-'}</div>
+        ${r.arrival_date ? `<div style="font-size:11px;color:var(--text3)">到貨：${r.arrival_date}</div>` : ''}
+      </td>
+      <td data-label="商品">
         <div style="font-weight:500;font-size:13px">${p?.name || '未知商品'}</div>
         ${p?.sku ? `<div style="font-size:11px;color:var(--text3)">${p.sku}</div>` : ''}
       </td>
-      <td style="font-weight:600;color:var(--success)">+${r.qty} 件</td>
-      <td style="font-size:13px">${r.unit_cost ? `$${r.unit_cost}/件（共 $${totalCost.toLocaleString()}）` : '-'}</td>
-      <td style="font-size:12.5px;color:var(--text2)">${r.note || '-'}</td>
-      <td style="white-space:nowrap">
+      <td data-label="進貨數量" style="font-weight:600;color:var(--success)">${unitDisplay}</td>
+      <td data-label="進貨成本" style="font-size:13px">${r.unit_cost ? `$${r.unit_cost}/件（共 $${totalCost.toLocaleString()}）` : '-'}</td>
+      <td data-label="備註" style="font-size:12.5px;color:var(--text2)">${r.note || '-'}</td>
+      <td>
         <button class="btn btn-sm" onclick="openStockModal(null,'${r.id}')" style="margin-right:4px">編輯</button>
         <button class="btn btn-sm btn-danger" onclick="deleteStockRecord('${r.id}')">刪除</button>
       </td>
@@ -4243,32 +4283,94 @@ function populateStockProductFilter() {
   });
 }
 
+function updateStockUnitPreview() {
+  const unitName = document.getElementById('productStockUnit')?.value || '箱';
+  document.getElementById('stockUnitPreview').textContent = unitName;
+  document.getElementById('stockUnitPreview2').textContent = unitName;
+}
+
+function updateStockUnitInfo() {
+  const productId = document.getElementById('stockProductSel').value;
+  const p = products.find(x => x.id === productId);
+  const infoBox = document.getElementById('stockUnitInfoBox');
+  const unitName = document.getElementById('stockUnitName');
+  const qtyLabel = document.getElementById('stockQtyLabel');
+
+  if (p?.track_stock && p?.stock_unit && p?.stock_unit_qty > 1) {
+    infoBox.style.display = 'block';
+    document.getElementById('stockUnitInfoText').innerHTML =
+      `📦 入庫單位：<strong>1 ${p.stock_unit} = ${p.stock_unit_qty} 件</strong>　輸入 ${p.stock_unit}數，系統自動換算`;
+    unitName.textContent = p.stock_unit;
+    qtyLabel.innerHTML = `入庫數量（${p.stock_unit}）<span style="color:var(--danger)">*</span>`;
+  } else {
+    infoBox.style.display = 'none';
+    unitName.textContent = '件';
+    qtyLabel.innerHTML = `入庫數量（件）<span style="color:var(--danger)">*</span>`;
+  }
+  updateStockQtyPreview();
+}
+
+function updateStockQtyPreview() {
+  const productId = document.getElementById('stockProductSel').value;
+  const p = products.find(x => x.id === productId);
+  const qtyInput = parseInt(document.getElementById('stockQty').value) || 0;
+  const preview = document.getElementById('stockQtyPreview');
+
+  if (p?.stock_unit_qty > 1 && qtyInput > 0) {
+    const total = qtyInput * p.stock_unit_qty;
+    preview.textContent = `= ${total} 件（${qtyInput} ${p.stock_unit} × ${p.stock_unit_qty} 件）`;
+  } else {
+    preview.textContent = '';
+  }
+}
+
 function openStockModal(productId, recordId) {
   const r = recordId ? stockRecords.find(x => x.id === recordId) : null;
   document.getElementById('stockModalTitle').textContent = r ? '編輯進貨記錄' : '新增進貨';
-  document.getElementById('stockProductSel').value = r?.product_id || productId || '';
-  document.getElementById('stockQty').value = r?.qty || '';
-  document.getElementById('stockUnitCost').value = r?.unit_cost || '';
-  document.getElementById('stockDate').value = r?.record_date || new Date().toISOString().slice(0, 10);
-  document.getElementById('stockNote').value = r?.note || '';
   document.getElementById('stockRecordId').value = r?.id || '';
+  document.getElementById('stockDate').value = r?.record_date || new Date().toISOString().slice(0, 10);
+  document.getElementById('stockArrivalDate').value = r?.arrival_date || '';
+  document.getElementById('stockNote').value = r?.note || '';
+  document.getElementById('stockUnitCost').value = r?.unit_cost || '';
+  document.getElementById('stockQtyPreview').textContent = '';
+
   populateStockProductFilter();
+  document.getElementById('stockProductSel').value = r?.product_id || productId || '';
+  updateStockUnitInfo();
+
+  // For edit: show unit qty (reverse-calculate if needed)
+  if (r) {
+    const p = products.find(x => x.id === r.product_id);
+    const unitQty = p?.stock_unit_qty || 1;
+    document.getElementById('stockQty').value = unitQty > 1 ? Math.round(r.qty / unitQty) : r.qty;
+    updateStockQtyPreview();
+  } else {
+    document.getElementById('stockQty').value = '';
+  }
+
   document.getElementById('stockModal').classList.add('show');
 }
 
 async function saveStockRecord() {
   const productId = document.getElementById('stockProductSel').value;
-  const qty = parseInt(document.getElementById('stockQty').value);
+  const qtyInput = parseInt(document.getElementById('stockQty').value);
   if (!productId) { alert('請選擇商品'); return; }
-  if (!qty || qty < 1) { alert('請輸入進貨數量'); return; }
+  if (!qtyInput || qtyInput < 1) { alert('請輸入數量'); return; }
+
+  const p = products.find(x => x.id === productId);
+  const unitQty = p?.stock_unit_qty || 1;
+  const actualQty = qtyInput * unitQty; // convert to pieces
 
   const id = document.getElementById('stockRecordId').value;
   const data = {
     id: id || generateId(),
     product_id: productId,
-    qty,
+    qty: actualQty,           // always store in pieces
+    input_qty: qtyInput,      // original input (boxes/units)
+    input_unit: p?.stock_unit || '件',
     unit_cost: parseFloat(document.getElementById('stockUnitCost').value) || 0,
     record_date: document.getElementById('stockDate').value,
+    arrival_date: document.getElementById('stockArrivalDate').value || null,
     note: document.getElementById('stockNote').value.trim(),
     created_at: id ? stockRecords.find(r=>r.id===id)?.created_at : new Date().toISOString(),
   };
@@ -4292,6 +4394,7 @@ async function deleteStockRecord(id) {
 function toggleStockAlertField() {
   const checked = document.getElementById('productTrackStock').checked;
   document.getElementById('stockAlertWrap').style.display = checked ? 'block' : 'none';
+  updateStockUnitPreview();
 }
 
 // Inventory low-stock dashboard alert
@@ -4376,7 +4479,10 @@ function openProductModal(id) {
   document.getElementById('productNote').value = p?.note || '';
   document.getElementById('productTrackStock').checked = p?.track_stock || false;
   document.getElementById('productStockAlert').value = p?.stock_alert || 10;
+  document.getElementById('productStockUnit').value = p?.stock_unit || '箱';
+  document.getElementById('productStockUnitQty').value = p?.stock_unit_qty || '';
   document.getElementById('stockAlertWrap').style.display = p?.track_stock ? 'block' : 'none';
+  updateStockUnitPreview();
   document.getElementById('productId').value = p?.id || '';
 
   // Populate vendor dropdown
@@ -4408,6 +4514,8 @@ async function saveProduct() {
     note:       document.getElementById('productNote').value.trim(),
     track_stock: document.getElementById('productTrackStock').checked,
     stock_alert: parseInt(document.getElementById('productStockAlert').value) || 10,
+    stock_unit: document.getElementById('productStockUnit').value.trim() || '箱',
+    stock_unit_qty: parseInt(document.getElementById('productStockUnitQty').value) || 1,
     created_at: id ? (products.find(p=>p.id===id)?.created_at || new Date().toISOString()) : new Date().toISOString(),
   };
 
