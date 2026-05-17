@@ -2193,21 +2193,21 @@ async function renderAccounts() {
   if (!tbody) return;
 
   if (!settings.sbUrl || !settings.sbKey) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty-state" style="padding:1rem;color:var(--text3)">請先設定 Supabase 連線</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state" style="padding:1rem;color:var(--text3)">請先設定 Supabase 連線</td></tr>';
     return;
   }
 
-  tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);text-align:center;padding:1rem">載入中…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text3);text-align:center;padding:1rem">載入中…</td></tr>';
 
   try {
     const res = await fetch(
-      `${settings.sbUrl}/rest/v1/accounts?select=id,username,note&order=username`,
+      `${settings.sbUrl}/rest/v1/accounts?select=id,username,note,role,permissions&order=username`,
       { headers: { apikey: settings.sbKey, Authorization: 'Bearer ' + settings.sbKey } }
     );
     _sbAccounts = await res.json();
 
     if (!_sbAccounts.length) {
-      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);text-align:center;padding:1rem">尚無帳號</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text3);text-align:center;padding:1rem">尚無帳號</td></tr>';
       return;
     }
 
@@ -2239,8 +2239,8 @@ function openAccountModal(id) {
   document.getElementById('accPass2').value = '';
   document.getElementById('accNote').value  = a?.note || '';
   document.getElementById('accId').value    = a?.id || '';
-  // Set permission checkboxes
-  const perms = a?.permissions || (a ? [] : ALL_PAGES); // new account defaults to all
+  // Set permission checkboxes — if no permissions set, default to all for existing accounts
+  const perms = a?.permissions?.length ? a.permissions : (a ? ALL_PAGES : ALL_PAGES);
   document.querySelectorAll('.acc-perm').forEach(cb => {
     cb.checked = perms.includes(cb.value);
   });
