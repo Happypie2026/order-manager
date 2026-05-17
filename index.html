@@ -509,6 +509,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span>業績報表</span>
       </div>
+      <div class="nav-item" onclick="showPage('inventory')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
+        <span>庫存管理</span>
+      </div>
       <div class="nav-item" onclick="showPage('vendors')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         <span>廠商管理</span>
@@ -551,6 +555,8 @@
         <div class="page-title">總覽儀表板</div>
         <div class="page-sub">所有平台訂單整合概況</div>
       </div>
+      <!-- Stock alert banner -->
+      <div id="stockAlertBanner" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:1rem;font-size:13px;color:#b91c1c"></div>
       <div class="stats-row" id="dashStats"></div>
       <div class="grid-2 mb-3">
         <div class="card card-pad">
@@ -805,6 +811,41 @@
       </div>
     </div>
 
+    <!-- Inventory -->
+    <div class="page" id="page-inventory">
+      <div class="page-header flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="page-title">庫存管理</div>
+          <div class="page-sub">進貨記錄、當前庫存、銷售速度</div>
+        </div>
+        <button class="btn btn-primary" onclick="openStockModal()">＋ 新增進貨</button>
+      </div>
+
+      <!-- Stock summary cards -->
+      <div id="stockSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:1.5rem"></div>
+
+      <!-- Stock records table -->
+      <div class="card card-pad">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+          <div style="font-size:14px;font-weight:600">進貨記錄</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="stockProductFilter" onchange="renderStockRecords()" style="width:auto">
+              <option value="">全部商品</option>
+            </select>
+            <input type="month" id="stockMonthFilter" onchange="renderStockRecords()" style="width:auto">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>日期</th><th>商品</th><th>進貨數量</th><th>進貨成本</th><th>備註</th><th>操作</th>
+            </tr></thead>
+            <tbody id="stockRecordsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Vendors -->
     <div class="page" id="page-vendors">
       <div class="page-header flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
@@ -1042,11 +1083,67 @@
         <label>備註</label>
         <input type="text" id="productNote" placeholder="例：冷藏品、易碎品、季節限定…">
       </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:0.75rem 0">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+          <input type="checkbox" id="productTrackStock" style="width:16px;height:16px;accent-color:var(--accent)" onchange="toggleStockAlertField()">
+          📦 追蹤庫存
+        </label>
+        <div style="font-size:12px;color:var(--text3)">啟用後可記錄進貨、追蹤庫存量</div>
+      </div>
+      <div id="stockAlertWrap" style="display:none">
+        <div class="form-row" style="margin-bottom:0">
+          <label>庫存警示數量</label>
+          <input type="number" id="productStockAlert" placeholder="例：10" min="0" step="1" style="width:120px">
+          <div style="font-size:11.5px;color:var(--text3);margin-top:4px">庫存低於此數量時，儀表板顯示警示</div>
+        </div>
+      </div>
       <input type="hidden" id="productId">
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('productModal')">取消</button>
       <button class="btn btn-primary" onclick="saveProduct()">儲存商品</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stock Record Modal -->
+<div class="modal-overlay" id="stockModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="stockModalTitle">新增進貨</div>
+      <button class="modal-close" onclick="closeModal('stockModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>商品 <span style="color:var(--danger)">*</span></label>
+        <select id="stockProductSel" style="width:100%">
+          <option value="">— 選擇商品 —</option>
+        </select>
+      </div>
+      <div class="form-grid">
+        <div class="form-row" style="margin-bottom:0">
+          <label>進貨數量 <span style="color:var(--danger)">*</span></label>
+          <input type="number" id="stockQty" placeholder="例：100" min="1" step="1">
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label>進貨成本（每件）</label>
+          <input type="number" id="stockUnitCost" placeholder="例：250" min="0" step="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>進貨日期</label>
+        <input type="date" id="stockDate">
+      </div>
+      <div class="form-row">
+        <label>備註</label>
+        <input type="text" id="stockNote" placeholder="例：第一批進貨、促銷備貨…">
+      </div>
+      <input type="hidden" id="stockRecordId">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('stockModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveStockRecord()">儲存</button>
     </div>
   </div>
 </div>
@@ -2303,6 +2400,7 @@ window.onload = async () => {
 
   // Load all data from Supabase
   await loadFromSupabase();
+  await loadStockRecords();
 
   // Restore active page
   document.getElementById('page-dashboard').classList.add('active');
@@ -2349,11 +2447,12 @@ function showPage(id) {
   if (id === 'mapping') renderMappingCards();
   if (id === 'vendors') renderVendors();
   if (id === 'products') { populateProductVendorFilter(); renderProducts(); }
-  if (id === 'settings') renderAccounts();
+  if (id === 'inventory') { populateStockProductFilter(); renderStockSummary(); renderStockRecords(); }
 }
 
 // ==================== DASHBOARD ====================
 function renderDashboard() {
+  renderStockAlert();
   const valid = orders.filter(o => o.status !== 'cancelled');
   const revenue = valid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
   const pending = orders.filter(o => o.status === 'pending').length;
@@ -3968,6 +4067,254 @@ async function bulkDelete() {
   renderOrders(); renderDashboard(); updatePendingBadge();
 }
 
+// ==================== INVENTORY ====================
+let stockRecords = []; // [{ id, product_id, qty, unit_cost, note, record_date, created_at }]
+
+async function loadStockRecords() {
+  try {
+    const res = await SB.get('stock_records', 'select=*&order=record_date.desc');
+    stockRecords = Array.isArray(res) ? res : [];
+  } catch(e) {
+    stockRecords = JSON.parse(localStorage.getItem('stockRecords') || '[]');
+  }
+}
+
+async function saveStockRecordToDB(r) {
+  const idx = stockRecords.findIndex(x => x.id === r.id);
+  if (idx >= 0) stockRecords[idx] = r; else stockRecords.push(r);
+  localStorage.setItem('stockRecords', JSON.stringify(stockRecords));
+  try { await SB.upsert('stock_records', r); } catch(e) { console.warn('saveStock:', e.message); }
+}
+
+async function deleteStockRecordFromDB(id) {
+  stockRecords = stockRecords.filter(x => x.id !== id);
+  localStorage.setItem('stockRecords', JSON.stringify(stockRecords));
+  try { await SB.delete('stock_records', id); } catch(e) { console.warn('deleteStock:', e.message); }
+}
+
+// Calculate current stock for a product
+function calcCurrentStock(productId) {
+  // Total incoming
+  const totalIn = stockRecords
+    .filter(r => r.product_id === productId)
+    .reduce((s, r) => s + (parseInt(r.qty) || 0), 0);
+
+  // Total sold (shipped orders)
+  const totalSold = orders
+    .filter(o => !o.is_merged_secondary && o.status === 'shipped')
+    .reduce((s, o) => {
+      const items = getOrderItems(o);
+      items.forEach(it => {
+        const linked = it.linked_products?.length
+          ? it.linked_products
+          : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty }] : []);
+        linked.forEach(li => {
+          if (li.product_id === productId) s += parseInt(li.qty || it.product_qty || 1) || 1;
+        });
+      });
+      return s;
+    }, 0);
+
+  return { totalIn, totalSold, current: totalIn - totalSold };
+}
+
+// Calculate sales speed: avg units sold per day over last 30 days
+function calcSalesSpeed(productId) {
+  const now = new Date();
+  const days30ago = new Date(now - 30 * 86400000);
+  let sold30 = 0;
+
+  orders.filter(o => !o.is_merged_secondary && o.status === 'shipped' &&
+    new Date(o.order_date || o.created_at) >= days30ago
+  ).forEach(o => {
+    const items = getOrderItems(o);
+    items.forEach(it => {
+      const linked = it.linked_products?.length
+        ? it.linked_products
+        : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty }] : []);
+      linked.forEach(li => {
+        if (li.product_id === productId) sold30 += parseInt(li.qty || it.product_qty || 1) || 1;
+      });
+    });
+  });
+
+  const perDay = sold30 / 30;
+  return { sold30, perDay: Math.round(perDay * 10) / 10 };
+}
+
+function renderStockSummary() {
+  const trackedProducts = products.filter(p => p.track_stock);
+  const el = document.getElementById('stockSummaryCards');
+  if (!el) return;
+
+  if (!trackedProducts.length) {
+    el.innerHTML = `<div style="grid-column:1/-1;color:var(--text3);font-size:13px;padding:1rem 0">
+      尚無設定追蹤庫存的商品。請到「商品管理」開啟商品的「追蹤庫存」選項。
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = trackedProducts.map(p => {
+    const { current, totalIn, totalSold } = calcCurrentStock(p.id);
+    const { perDay, sold30 } = calcSalesSpeed(p.id);
+    const daysLeft = perDay > 0 ? Math.floor(current / perDay) : null;
+    const alert = p.stock_alert || 10;
+    const isLow = current <= alert;
+    const v = vendors.find(vd => vd.id === p.vendor_id);
+
+    return `<div style="background:var(--surface);border:1.5px solid ${isLow ? 'var(--danger)' : 'var(--border)'};border-radius:var(--radius);padding:1rem">
+      <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div style="font-size:13.5px;font-weight:700">${p.name}</div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:2px">${p.sku}${v ? ' · ' + v.name : ''}</div>
+        </div>
+        ${isLow ? `<span style="background:#fee2e2;color:#b91c1c;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;flex-shrink:0">⚠️ 庫存不足</span>` : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px">
+          <div style="font-size:20px;font-weight:700;color:${isLow?'var(--danger)':'var(--text)'}">${current}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">當前庫存</div>
+        </div>
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px">
+          <div style="font-size:20px;font-weight:700;color:var(--info)">${sold30}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">近30天出貨</div>
+        </div>
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px">
+          <div style="font-size:20px;font-weight:700;color:${daysLeft !== null && daysLeft < 14 ? 'var(--warning)' : 'var(--text)'}">${daysLeft !== null ? daysLeft + '天' : '—'}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">預估可售</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);display:flex;justify-content:space-between;margin-bottom:8px">
+        <span>總進貨：${totalIn} 件</span>
+        <span>已出貨：${totalSold} 件</span>
+        <span>日均：${perDay} 件/天</span>
+      </div>
+      <button onclick="openStockModal('${p.id}')" class="btn btn-sm" style="width:100%;justify-content:center">＋ 新增進貨</button>
+    </div>`;
+  }).join('');
+}
+
+function renderStockRecords() {
+  const body = document.getElementById('stockRecordsBody');
+  if (!body) return;
+
+  const filterProd = document.getElementById('stockProductFilter')?.value || '';
+  const filterMonth = document.getElementById('stockMonthFilter')?.value || '';
+
+  let filtered = [...stockRecords];
+  if (filterProd) filtered = filtered.filter(r => r.product_id === filterProd);
+  if (filterMonth) filtered = filtered.filter(r => (r.record_date || '').startsWith(filterMonth));
+
+  if (!filtered.length) {
+    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="es-icon">📦</div><p>尚無進貨記錄</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = filtered.map(r => {
+    const p = products.find(x => x.id === r.product_id);
+    const totalCost = (r.qty || 0) * (r.unit_cost || 0);
+    return `<tr>
+      <td style="font-size:13px">${r.record_date || '-'}</td>
+      <td>
+        <div style="font-weight:500;font-size:13px">${p?.name || '未知商品'}</div>
+        ${p?.sku ? `<div style="font-size:11px;color:var(--text3)">${p.sku}</div>` : ''}
+      </td>
+      <td style="font-weight:600;color:var(--success)">+${r.qty} 件</td>
+      <td style="font-size:13px">${r.unit_cost ? `$${r.unit_cost}/件（共 $${totalCost.toLocaleString()}）` : '-'}</td>
+      <td style="font-size:12.5px;color:var(--text2)">${r.note || '-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="openStockModal(null,'${r.id}')" style="margin-right:4px">編輯</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteStockRecord('${r.id}')">刪除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function populateStockProductFilter() {
+  const sel = document.getElementById('stockProductFilter');
+  const sel2 = document.getElementById('stockProductSel');
+  if (!sel || !sel2) return;
+  const tracked = products.filter(p => p.track_stock);
+  while (sel.options.length > 1) sel.remove(1);
+  while (sel2.options.length > 1) sel2.remove(1);
+  tracked.forEach(p => {
+    sel.add(new Option(`${p.name}（${p.sku}）`, p.id));
+    sel2.add(new Option(`${p.name}（${p.sku}）`, p.id));
+  });
+}
+
+function openStockModal(productId, recordId) {
+  const r = recordId ? stockRecords.find(x => x.id === recordId) : null;
+  document.getElementById('stockModalTitle').textContent = r ? '編輯進貨記錄' : '新增進貨';
+  document.getElementById('stockProductSel').value = r?.product_id || productId || '';
+  document.getElementById('stockQty').value = r?.qty || '';
+  document.getElementById('stockUnitCost').value = r?.unit_cost || '';
+  document.getElementById('stockDate').value = r?.record_date || new Date().toISOString().slice(0, 10);
+  document.getElementById('stockNote').value = r?.note || '';
+  document.getElementById('stockRecordId').value = r?.id || '';
+  populateStockProductFilter();
+  document.getElementById('stockModal').classList.add('show');
+}
+
+async function saveStockRecord() {
+  const productId = document.getElementById('stockProductSel').value;
+  const qty = parseInt(document.getElementById('stockQty').value);
+  if (!productId) { alert('請選擇商品'); return; }
+  if (!qty || qty < 1) { alert('請輸入進貨數量'); return; }
+
+  const id = document.getElementById('stockRecordId').value;
+  const data = {
+    id: id || generateId(),
+    product_id: productId,
+    qty,
+    unit_cost: parseFloat(document.getElementById('stockUnitCost').value) || 0,
+    record_date: document.getElementById('stockDate').value,
+    note: document.getElementById('stockNote').value.trim(),
+    created_at: id ? stockRecords.find(r=>r.id===id)?.created_at : new Date().toISOString(),
+  };
+
+  const btn = document.querySelector('#stockModal .btn-primary');
+  if (btn) { btn.textContent = '儲存中…'; btn.disabled = true; }
+  await saveStockRecordToDB(data);
+  if (btn) { btn.textContent = '儲存'; btn.disabled = false; }
+  closeModal('stockModal');
+  renderStockSummary();
+  renderStockRecords();
+}
+
+async function deleteStockRecord(id) {
+  if (!confirm('確定刪除這筆進貨記錄？')) return;
+  await deleteStockRecordFromDB(id);
+  renderStockSummary();
+  renderStockRecords();
+}
+
+function toggleStockAlertField() {
+  const checked = document.getElementById('productTrackStock').checked;
+  document.getElementById('stockAlertWrap').style.display = checked ? 'block' : 'none';
+}
+
+// Inventory low-stock dashboard alert
+function renderStockAlert() {
+  const tracked = products.filter(p => p.track_stock);
+  const lowStock = tracked.filter(p => {
+    const { current } = calcCurrentStock(p.id);
+    return current <= (p.stock_alert || 10);
+  });
+
+  const el = document.getElementById('stockAlertBanner');
+  if (!el) return;
+  if (!lowStock.length) { el.style.display = 'none'; return; }
+
+  el.style.display = 'block';
+  el.innerHTML = `<div style="font-weight:600;margin-bottom:6px">⚠️ ${lowStock.length} 項商品庫存不足：</div>
+    ${lowStock.map(p => {
+      const { current } = calcCurrentStock(p.id);
+      return `<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:10px;margin:2px;display:inline-block;font-size:12px">${p.name} (剩 ${current} 件)</span>`;
+    }).join('')}
+    <button onclick="showPage('inventory')" class="btn btn-sm" style="margin-left:8px;background:#b91c1c;color:#fff;border-color:#b91c1c">前往補貨</button>`;
+}
+
 // ==================== PRODUCTS ====================
 function populateProductVendorFilter() {
   const sel = document.getElementById('productVendorFilter');
@@ -4027,6 +4374,9 @@ function openProductModal(id) {
   document.getElementById('productShortName').value = p?.short_name || '';
   document.getElementById('productCost').value = p?.cost || '';
   document.getElementById('productNote').value = p?.note || '';
+  document.getElementById('productTrackStock').checked = p?.track_stock || false;
+  document.getElementById('productStockAlert').value = p?.stock_alert || 10;
+  document.getElementById('stockAlertWrap').style.display = p?.track_stock ? 'block' : 'none';
   document.getElementById('productId').value = p?.id || '';
 
   // Populate vendor dropdown
@@ -4056,6 +4406,8 @@ async function saveProduct() {
     vendor_id:  document.getElementById('productVendor').value,
     cost:       parseFloat(document.getElementById('productCost').value) || 0,
     note:       document.getElementById('productNote').value.trim(),
+    track_stock: document.getElementById('productTrackStock').checked,
+    stock_alert: parseInt(document.getElementById('productStockAlert').value) || 10,
     created_at: id ? (products.find(p=>p.id===id)?.created_at || new Date().toISOString()) : new Date().toISOString(),
   };
 
@@ -5196,6 +5548,10 @@ create policy "Allow all" on orders for all using (true) with check (true);`;
     <div class="mnav-item" id="mnav-vendors" onclick="showPage('vendors');setMobileNav('vendors')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       廠商
+    </div>
+    <div class="mnav-item" id="mnav-inventory" onclick="showPage('inventory');setMobileNav('inventory')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
+      庫存
     </div>
     <div class="mnav-item" id="mnav-products" onclick="showPage('products');setMobileNav('products')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
