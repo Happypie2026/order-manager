@@ -4494,7 +4494,7 @@ function renderStockSummary() {
     const { perDay, sold30 } = calcSalesSpeed(p.id);
     const daysLeft = perDay > 0 ? Math.floor(current / perDay) : null;
     const alert = p.stock_alert || 10;
-    const isLow = current <= alert;
+    const isLow = false; // warning display disabled
     const v = vendors.find(vd => vd.id === p.vendor_id);
 
     const daysColor = daysLeft === null ? 'var(--text3)' : daysLeft < 7 ? 'var(--danger)' : daysLeft < 14 ? 'var(--warning)' : 'var(--success)';
