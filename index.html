@@ -1190,6 +1190,37 @@
 </div>
 
 <!-- Stock Record Modal -->
+<!-- Delete Stock Modal -->
+<div class="modal-overlay" id="deleteStockModal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title">🗑 刪除庫存</div>
+      <button class="modal-close" onclick="closeModal('deleteStockModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="deleteStockProductName" style="font-size:15px;font-weight:600;margin-bottom:4px"></div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1.25rem">
+        目前庫存：<span id="deleteStockCurrentQty" style="font-weight:700;color:var(--text)"></span> 件
+      </div>
+      <div class="alert alert-warning" style="margin-bottom:1rem">
+        ⚠️ 此操作會新增一筆「負數進貨」來修正庫存，用於修正誤進貨數量。
+      </div>
+      <div class="form-row">
+        <label>要扣除的數量 *</label>
+        <input type="number" id="deleteStockQty" min="1" placeholder="請輸入要扣除的件數" style="font-size:15px">
+      </div>
+      <div class="form-row">
+        <label>備註（選填）</label>
+        <input type="text" id="deleteStockNote" placeholder="例：誤進貨退回、庫存調整…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('deleteStockModal')">取消</button>
+      <button class="btn btn-danger" onclick="confirmDeleteStock()">確認扣除</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="stockModal">
   <div class="modal" style="width:480px">
     <div class="modal-header">
@@ -4482,7 +4513,10 @@ function renderStockSummary() {
       <td style="text-align:center;color:var(--text2)">${perDay > 0 ? perDay + ' 件/天' : '—'}</td>
       <td style="text-align:center;font-weight:600;color:${daysColor}">${daysLeft !== null ? daysLeft + ' 天' : '—'}</td>
       <td style="text-align:right">
-        <button onclick="openStockModal('${p.id}')" class="btn btn-sm btn-primary" style="white-space:nowrap">＋ 進貨</button>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button onclick="openStockModal('${p.id}')" class="btn btn-sm btn-primary" style="white-space:nowrap">＋ 進貨</button>
+          <button onclick="openDeleteStockModal('${p.id}')" class="btn btn-sm" style="white-space:nowrap;background:var(--danger-light);color:var(--danger);border-color:#f5c6c6">🗑 刪除庫存</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -4801,6 +4835,53 @@ async function saveStockRecord() {
   closeModal('stockModal');
   renderStockSummary();
   renderStockRecords();
+}
+
+function openDeleteStockModal(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  const { current } = calcCurrentStock(productId);
+  document.getElementById('deleteStockProductName').textContent = p.name;
+  document.getElementById('deleteStockCurrentQty').textContent = current;
+  document.getElementById('deleteStockQty').value = '';
+  document.getElementById('deleteStockNote').value = '';
+  document.getElementById('deleteStockModal').dataset.productId = productId;
+  document.getElementById('deleteStockModal').classList.add('show');
+  setTimeout(() => document.getElementById('deleteStockQty').focus(), 100);
+}
+
+async function confirmDeleteStock() {
+  const productId = document.getElementById('deleteStockModal').dataset.productId;
+  const qty = parseInt(document.getElementById('deleteStockQty').value);
+  const note = document.getElementById('deleteStockNote').value.trim();
+
+  if (!qty || qty <= 0) {
+    alert('請輸入要扣除的數量（需大於 0）');
+    return;
+  }
+
+  const { current } = calcCurrentStock(productId);
+  if (qty > current) {
+    if (!confirm(`扣除數量（${qty}）大於目前庫存（${current}），庫存將變為負數，確定繼續？`)) return;
+  }
+
+  const record = {
+    id: 'sr_' + Date.now(),
+    product_id: productId,
+    qty: -qty,  // negative to reduce stock
+    unit_cost: 0,
+    note: note || '庫存調整（刪除）',
+    record_date: new Date().toISOString().slice(0, 10),
+    arrival_date: new Date().toISOString().slice(0, 10),
+    arrived: true,
+    created_at: new Date().toISOString(),
+  };
+
+  await saveStockRecordToDB(record);
+  closeModal('deleteStockModal');
+  renderStockSummary();
+  renderStockRecords();
+  renderDashboard();
 }
 
 async function deleteStockRecord(id) {
