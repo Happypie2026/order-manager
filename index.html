@@ -1174,9 +1174,15 @@
     <div class="modal-body">
       <div class="form-row">
         <label>商品 <span style="color:var(--danger)">*</span></label>
-        <select id="stockProductSel" style="width:100%" onchange="updateStockUnitInfo()">
-          <option value="">— 選擇商品 —</option>
-        </select>
+        <div class="ss-wrap" id="stockProductSSWrap">
+          <div class="ss-input-row">
+            <input type="text" class="ss-input" id="stockProductSSInput" placeholder="輸入商品名稱或料號搜尋…" autocomplete="off"
+              oninput="filterStockProductSS()" onfocus="openStockProductSS()" onblur="closeStockProductSSDelay()">
+            <button class="ss-clear" id="stockProductSSClear" onclick="clearStockProductSS()">×</button>
+          </div>
+          <div class="ss-dropdown" id="stockProductSSDropdown"></div>
+        </div>
+        <input type="hidden" id="stockProductSel">
       </div>
 
       <!-- Unit info box (shows when product has unit setting) -->
@@ -4396,6 +4402,55 @@ function updateStockUnitPreview() {
   document.getElementById('stockUnitPreview2').textContent = unitName;
 }
 
+function filterStockProductSS() {
+  const q = document.getElementById('stockProductSSInput').value.toLowerCase();
+  const tracked = products.filter(p => p.track_stock);
+  const filtered = tracked.filter(p =>
+    p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) ||
+    (vendors.find(v=>v.id===p.vendor_id)?.name||'').toLowerCase().includes(q)
+  );
+  const dd = document.getElementById('stockProductSSDropdown');
+  dd.innerHTML = filtered.length
+    ? filtered.map(p => {
+        const v = vendors.find(vd=>vd.id===p.vendor_id);
+        return `<div class="ss-option" onmousedown="selectStockProductSS('${p.id}','${p.name.replace(/'/g,"\\'")}')">
+          <div>${p.name}</div>
+          <div class="ss-sub">${p.sku}${v?' · '+v.name:''}</div>
+        </div>`;
+      }).join('')
+    : '<div class="ss-empty">找不到追蹤庫存的商品</div>';
+  dd.classList.add('open');
+  document.getElementById('stockProductSSClear').classList.toggle('show', !!document.getElementById('stockProductSSInput').value);
+}
+
+function openStockProductSS() {
+  filterStockProductSS();
+}
+
+function closeStockProductSSDelay() {
+  setTimeout(() => {
+    document.getElementById('stockProductSSDropdown').classList.remove('open');
+  }, 200);
+}
+
+function selectStockProductSS(id, name) {
+  document.getElementById('stockProductSel').value = id;
+  document.getElementById('stockProductSSInput').value = name;
+  document.getElementById('stockProductSSClear').classList.add('show');
+  document.getElementById('stockProductSSDropdown').classList.remove('open');
+  updateStockUnitInfo();
+}
+
+function clearStockProductSS() {
+  document.getElementById('stockProductSel').value = '';
+  document.getElementById('stockProductSSInput').value = '';
+  document.getElementById('stockProductSSClear').classList.remove('show');
+  document.getElementById('stockUnitInfoBox').style.display = 'none';
+  document.getElementById('stockQtyUnit').innerHTML = '<option value="piece">件</option>';
+  document.getElementById('stockQtyPreview').textContent = '';
+  document.getElementById('stockProductSSInput').focus();
+}
+
 function updateStockUnitInfo() {
   const productId = document.getElementById('stockProductSel').value;
   const p = products.find(x => x.id === productId);
@@ -4441,7 +4496,13 @@ function openStockModal(productId, recordId) {
   document.getElementById('stockQtyPreview').textContent = '';
 
   populateStockProductFilter();
-  document.getElementById('stockProductSel').value = r?.product_id || productId || '';
+
+  // Set searchable select
+  const pid = r?.product_id || productId || '';
+  document.getElementById('stockProductSel').value = pid;
+  const p = products.find(x => x.id === pid);
+  document.getElementById('stockProductSSInput').value = p?.name || '';
+  document.getElementById('stockProductSSClear').classList.toggle('show', !!pid);
   updateStockUnitInfo();
 
   // For edit: show unit qty (reverse-calculate if needed)
