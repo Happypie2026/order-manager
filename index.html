@@ -735,6 +735,7 @@
               <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="renderOrders()" onkeydown="if(event.key==='Enter')renderOrders()">
             </div>
             <select id="orderStatusFilter" onchange="renderOrders()">
+              <option value="__active__">待確認 ＋ 處理中</option>
               <option value="">全部狀態</option>
               <option value="pending">待確認</option>
               <option value="processing">處理中</option>
@@ -2452,7 +2453,7 @@ function showOrdersView(view) {
   const statusSel = document.getElementById('orderStatusFilter');
 
   if (view === 'active') {
-    if (statusSel) statusSel.value = '';
+    if (statusSel) statusSel.value = '__active__'; // pending + processing only
     orderFilter.holdingAreaId = '__none__';
   } else if (view === 'shipped') {
     if (statusSel) statusSel.value = 'shipped';
@@ -3517,7 +3518,11 @@ function renderOrders() {
     if (o.is_merged_secondary) return false;
 
     if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
-    if (st && o.status !== st) return false;
+    if (st === '__active__') {
+      if (o.status !== 'pending' && o.status !== 'processing') return false;
+    } else if (st) {
+      if (o.status !== st) return false;
+    }
 
     // Holding area filter
     if (haId) {
