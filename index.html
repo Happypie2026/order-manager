@@ -4003,7 +4003,6 @@ async function confirmSmartMergeAll() {
   let successCount = 0;
   for (const g of toMerge) {
     try {
-      // Reuse existing merge logic by temporarily setting selectedOrders
       const primaryOrder = g.orders.find(o => o.id === g.primaryId) || g.orders[0];
       const otherOrders  = g.orders.filter(o => o.id !== primaryOrder.id);
 
@@ -4019,13 +4018,17 @@ async function confirmSmartMergeAll() {
         merged_from: [...(primaryOrder.merged_from || [primaryOrder.order_id]), ...otherOrders.map(o => o.order_id)],
       };
 
-      await upsertOrderToDB(mergedOrder);
-      for (const o of otherOrders) await deleteOrderFromDB(o.id);
-
-      // Update local state
-      orders = orders.filter(o => !otherOrders.some(oo => oo.id === o.id));
+      // Update local orders array first
       const idx = orders.findIndex(o => o.id === mergedOrder.id);
       if (idx >= 0) orders[idx] = mergedOrder; else orders.unshift(mergedOrder);
+
+      // Save merged order to DB
+      await saveOrder_DB(mergedOrder);
+
+      // Delete other orders (deleteOrderFromDB also updates local orders array)
+      for (const o of otherOrders) {
+        await deleteOrderFromDB(o.id);
+      }
 
       successCount++;
     } catch(e) {
