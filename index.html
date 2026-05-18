@@ -42,6 +42,7 @@
     --fpg: #16a085; --fpg-bg: #e8f8f5;
     --website: #34495e; --website-bg: #ebedef;
     --kangcheng: #d35400; --kangcheng-bg: #fdf2e9;
+    --mahe: #c0392b; --mahe-bg: #fdf0f0;
     --radius: 10px;
     --radius-sm: 6px;
     --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
@@ -131,6 +132,7 @@
   .plat-fpg     { background: var(--fpg-bg);      color: var(--fpg); }
   .plat-website { background: var(--website-bg);  color: var(--website); }
   .plat-kangcheng { background: var(--kangcheng-bg); color: var(--kangcheng); }
+  .plat-mahe { background: var(--mahe-bg); color: var(--mahe); }
 
   /* Status */
   .status-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 2px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
@@ -636,6 +638,7 @@
           <div class="plat-tab"        data-plat="fpg"       onclick="selectImportPlat('fpg',this)">台塑</div>
           <div class="plat-tab"        data-plat="website"   onclick="selectImportPlat('website',this)">官網</div>
           <div class="plat-tab"        data-plat="kangcheng" onclick="selectImportPlat('kangcheng',this)">康承</div>
+          <div class="plat-tab"        data-plat="mahe"      onclick="selectImportPlat('mahe',this)">瑪黑</div>
         </div>
         <div id="platformHint" class="alert alert-info" style="margin-bottom:0"></div>
         <div style="margin-top:1rem" class="btn-row">
@@ -1922,6 +1925,7 @@ const PLATFORMS = {
   fpg:     { label: '台塑',      color: '#16a085', hint: '後台路徑：台塑購物賣家後台 → 訂單查詢 → 匯出' },
   website: { label: '官網',      color: '#34495e', hint: '官網後台 → 訂單管理 → 訂單列表 → 匯出 CSV ⚠️ 官網格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
   kangcheng: { label: '康承',    color: '#d35400', hint: '後台路徑：康承賣家後台 → 訂單管理 → 訂單查詢 → 匯出 ⚠️ 康承格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
+  mahe:    { label: '瑪黑',      color: '#c0392b', hint: '後台路徑：瑪黑賣家後台 → 訂單管理 → 訂單列表 → 匯出 CSV' },
 };
 
 // Base field definitions (all possible fields)
@@ -1962,6 +1966,7 @@ const PLATFORM_REQUIRED = {
   fpg:        ['order_id','buyer_name','buyer_phone_landline','buyer_phone_mobile','shipping_address','product_name','product_spec','product_qty','amount'],
   // 康承: 訂單編號+買家+地址+電話必填；金額/商品/規格選填（格式特殊，多列合併）
   kangcheng:  ['order_id','buyer_name','buyer_phone','shipping_address'],
+  mahe:       ['order_id','buyer_name','buyer_phone','shipping_address','product_name','product_qty','amount'],
 };
 
 // Platforms where multiple CSV rows = one order (client data on first row, product rows below with blank order_id)
