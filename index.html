@@ -5711,22 +5711,24 @@ function exportBlackCat(rows, dateStr, temp) {
       'Y',                       // 易碎物品 (固定=Y)
       'N',                       // 精密儀器 (固定=N)
       (() => {
-        // 備註 = 廠商簡稱（取訂單商品的廠商）
-        const vendorIds = new Set();
+        // 備註 = 商品廠商簡稱（出貨用）+ 數量
+        const shortNameParts = [];
         items.forEach(it => {
           const linkedList = it.linked_products?.length
             ? it.linked_products
-            : (it.linked_product_id ? [{ product_id: it.linked_product_id }] : []);
+            : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty || it.platform_qty }] : []);
           linkedList.forEach(li => {
             const p = products.find(x => x.id === li.product_id);
-            if (p?.vendor_id) vendorIds.add(p.vendor_id);
+            const sn = p?.short_name || p?.name || '';
+            const q = li.qty || it.product_qty || it.platform_qty || '';
+            if (sn) shortNameParts.push(q ? `${sn}${q}` : sn);
           });
         });
-        const vendorNames = [...vendorIds].map(vid => {
-          const v = vendors.find(x => x.id === vid);
-          return v?.short_name || v?.name || '';
-        }).filter(Boolean);
-        return vendorNames.join('、') || '';
+        if (!shortNameParts.length && o.product_name) {
+          const q = o.product_qty || o.platform_qty || '';
+          shortNameParts.push(q ? `${o.product_name}${q}` : o.product_name);
+        }
+        return shortNameParts.join('+') || '';
       })(), // 備註
       '',                        // 報值(Y|N) 不填
       '',                        // 報值金額 (留空)
