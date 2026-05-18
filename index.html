@@ -3486,7 +3486,22 @@ function resetImport() { _workbook = null; setImportStep(1); document.getElement
 
 // ==================== ORDERS ====================
 function renderOrderPlatTabs() {
-  const visible = orders.filter(o => !o.is_merged_secondary);
+  const haId = orderFilter.holdingAreaId;
+  const st   = document.getElementById('orderStatusFilter')?.value || '';
+  const visible = orders.filter(o => {
+    if (o.is_merged_secondary) return false;
+    // Apply same status filter as current view
+    if (st === '__active__') {
+      if (o.status !== 'pending' && o.status !== 'processing') return false;
+    } else if (st) {
+      if (o.status !== st) return false;
+    }
+    // Apply same holding area filter as current view
+    if (haId === '__none__')        { if (o.holding_area_id) return false; }
+    else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
+    else if (haId)                  { if (o.holding_area_id !== haId) return false; }
+    return true;
+  });
   const counts = { all: visible.length };
   Object.keys(PLATFORMS).forEach(k => counts[k] = visible.filter(o => o.platform === k).length);
   const tabs = [{ key: 'all', label: '全部', count: counts.all }, ...Object.keys(PLATFORMS).map(k => ({ key: k, label: PLATFORMS[k].label, count: counts[k] }))];
