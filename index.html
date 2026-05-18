@@ -5702,10 +5702,27 @@ function exportBlackCat(rows, dateStr, temp) {
       nextDay(dateStr),          // 希望配達日 ← 匯出日期的隔天
       1,                         // 希望配合時段 (固定=1:13時前)
       1,                         // 品類代碼 (固定=1)
-      prodDesc,                  // 品名
+      '',                        // 品名 (不填入)
       'Y',                       // 易碎物品 (固定=Y)
       'N',                       // 精密儀器 (固定=N)
-      o.customer_note || o.vendor_note || '', // 備註
+      (() => {
+        // 備註 = 廠商簡稱（取訂單商品的廠商）
+        const vendorIds = new Set();
+        items.forEach(it => {
+          const linkedList = it.linked_products?.length
+            ? it.linked_products
+            : (it.linked_product_id ? [{ product_id: it.linked_product_id }] : []);
+          linkedList.forEach(li => {
+            const p = products.find(x => x.id === li.product_id);
+            if (p?.vendor_id) vendorIds.add(p.vendor_id);
+          });
+        });
+        const vendorNames = [...vendorIds].map(vid => {
+          const v = vendors.find(x => x.id === vid);
+          return v?.short_name || v?.name || '';
+        }).filter(Boolean);
+        return vendorNames.join('、') || '';
+      })(), // 備註
       '',                        // 報值(Y|N) 不填
       '',                        // 報值金額 (留空)
       'N',                       // 到付單 (固定=N)
