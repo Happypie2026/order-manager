@@ -1920,7 +1920,7 @@ const PLATFORMS = {
   eslite:  { label: '誠品',      color: '#2c3e50', hint: '後台路徑：誠品線上賣家後台 → 訂單管理 → 訂單查詢 → 匯出' },
   payeasy: { label: 'PayEasy',   color: '#8e44ad', hint: '後台路徑：PayEasy賣家後台 → 訂單管理 → 匯出訂單' },
   fpg:     { label: '台塑',      color: '#16a085', hint: '後台路徑：台塑購物賣家後台 → 訂單查詢 → 匯出' },
-  website: { label: '官網',      color: '#34495e', hint: '官網後台 → 訂單管理 → 訂單列表 → 匯出 CSV' },
+  website: { label: '官網',      color: '#34495e', hint: '官網後台 → 訂單管理 → 訂單列表 → 匯出 CSV ⚠️ 官網格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
   kangcheng: { label: '康承',    color: '#d35400', hint: '後台路徑：康承賣家後台 → 訂單管理 → 訂單查詢 → 匯出 ⚠️ 康承格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
 };
 
@@ -1957,7 +1957,7 @@ const PLATFORM_REQUIRED = {
   books:      ['order_id','buyer_name','buyer_phone','shipping_address','product_name',               'product_qty','amount'],
   fresh:      ['order_id','buyer_name','buyer_phone','shipping_address','product_name','product_spec','product_qty','amount'],
   payeasy:    ['order_id','buyer_name','buyer_phone','shipping_address','product_name',               'product_qty','amount'],
-  website:    ['order_id','buyer_name','buyer_phone','shipping_address','product_name',               'product_qty','amount'],
+  website:    ['order_id','buyer_name','buyer_phone','shipping_address'],  // 多列格式：商品資料在後續列
   eslite:     ['order_id','buyer_name','buyer_phone','shipping_city','shipping_district','shipping_detail','product_name','product_qty','amount'],
   fpg:        ['order_id','buyer_name','buyer_phone_landline','buyer_phone_mobile','shipping_address','product_name','product_spec','product_qty','amount'],
   // 康承: 訂單編號+買家+地址+電話必填；金額/商品/規格選填（格式特殊，多列合併）
@@ -1965,7 +1965,7 @@ const PLATFORM_REQUIRED = {
 };
 
 // Platforms where multiple CSV rows = one order (client data on first row, product rows below with blank order_id)
-const MULTI_ROW_PLATFORMS = new Set(['kangcheng']);
+const MULTI_ROW_PLATFORMS = new Set(['kangcheng', 'website']);
 
 // Per-platform extra fields (replaces default buyer_phone / shipping_address with split versions)
 const PLATFORM_EXTRA_FIELDS = {
@@ -1994,8 +1994,8 @@ function getFieldsForPlatform(platId) {
     // Address: single or split
     ...(useSplitAddr ? ['shipping_city','shipping_district','shipping_detail'] : ['shipping_address']),
     'product_name',
-    // 康承不需要商品規格欄位
-    ...(platId === 'kangcheng' ? [] : ['product_spec']),
+    // 康承、官網不需要商品規格欄位（格式已含在商品名稱內）
+    ...(platId === 'kangcheng' || platId === 'website' ? [] : ['product_spec']),
     'product_qty',
     // Platform-specific extras (shipping_interval for fresh)
     ...extraKeys.filter(k => !['shipping_city','shipping_district','shipping_detail','buyer_phone_landline','buyer_phone_mobile'].includes(k)),
@@ -2975,9 +2975,9 @@ function buildMappingUI(hasSaved) {
 
 function guessColumn(key, headers) {
   const guesses = {
-    order_id:              ['訂單編號','訂單號碼','Order No','order_id','訂單ID'],
-    buyer_name:            ['收件人','買家姓名','收件姓名','姓名','buyer_name'],
-    amount:                ['訂單金額','買家實付金額','訂單總金額','總金額','金額','amount'],
+    order_id:              ['訂單編號','訂單號碼','Order No','order_id','訂單ID','匯入單號','自訂編號'],
+    buyer_name:            ['收件人','買家姓名','收件姓名','姓名','buyer_name','客戶名稱'],
+    amount:                ['訂單金額','買家實付金額','訂單總金額','總金額','金額','amount','發票金額','折扣前總金額'],
     product_name:          ['商品名稱','品名','商品品名','商品','product_name','item_name','品項名稱'],
     product_spec:          ['商品規格','規格','顏色尺寸','款式','spec','variation','商品屬性','sku'],
     product_qty:           ['數量','購買數量','商品數量','qty','quantity','件數'],
@@ -2985,16 +2985,16 @@ function guessColumn(key, headers) {
     vendor_note:           ['廠商端備註','廠商備註','賣家備註','內部備註','廠商說明','vendor_note','seller_note'],
     shipping_interval:     ['出貨區間','出貨時間','配送區間','出貨日期區間','出貨日','預計出貨','ship_interval'],
     status:                ['訂單狀態','訂購狀態','狀態','status'],
-    order_date:            ['下單時間','訂單時間','訂購時間','建立時間','created_at'],
-    shipping_address:      ['收件地址','收貨地址','地址','address'],
+    order_date:            ['下單時間','訂單時間','訂購時間','建立時間','created_at','訂單建立時間'],
+    shipping_address:      ['收件地址','收貨地址','地址','address','客戶地址'],
     shipping_city:         ['縣市','city','收件縣市','地區縣市','行政縣市'],
     shipping_district:     ['鄉鎮市區','鄉鎮','district','收件鄉鎮','行政區'],
     shipping_detail:       ['詳細地址','街道','門牌','地址明細','detail','地址(不含縣市鄉鎮)'],
-    shipping_method:       ['配送方式','運送方式','物流','shipping'],
-    buyer_phone:           ['電話','手機','連絡電話','phone','電話號碼'],
+    shipping_method:       ['配送方式','運送方式','物流','shipping','物流方式'],
+    buyer_phone:           ['電話','手機','連絡電話','phone','電話號碼','客戶手機號碼'],
     buyer_phone_landline:  ['市話','聯絡市話','住宅電話','landline','電話(市話)'],
     buyer_phone_mobile:    ['手機','聯絡手機','行動電話','mobile','手機號碼'],
-    buyer_email:           ['Email','電子信箱','mail'],
+    buyer_email:           ['Email','電子信箱','mail','客戶電子信箱'],
     tracking_number:       ['追蹤號','物流號碼','運單號','tracking'],
   };
   const candidates = guesses[key] || [];
