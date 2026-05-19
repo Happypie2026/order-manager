@@ -718,6 +718,7 @@
         <div class="btn-row">
           <button class="btn" onclick="showVendorExportModal()">📦 依廠商匯出</button>
           <button class="btn" onclick="exportCSV()">📥 匯出 CSV</button>
+          <button class="btn btn-secondary" onclick="openNewOrderModal()" style="background:var(--surface2);border-color:var(--border)">✏️ 手動新增</button>
           <button class="btn btn-primary" onclick="showPage('import')">+ 匯入訂單</button>
         </div>
       </div>
@@ -1777,6 +1778,111 @@
 <div id="drawerOverlay" onclick="closeDrawer()" style="position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299;display:none"></div>
 
 <!-- Edit Order Modal (kept for table row edit button) -->
+<!-- New Order Modal -->
+<div class="modal-overlay" id="newOrderModal">
+  <div class="modal" style="width:640px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div class="modal-title">✏️ 手動新增訂單</div>
+      <button class="modal-close" onclick="closeModal('newOrderModal')">×</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto">
+
+      <div class="form-grid">
+        <div class="form-row">
+          <label>平台 *</label>
+          <select id="noPlat" style="width:100%" onchange="noUpdateOrderId()">
+            <option value="">— 選擇平台 —</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>訂單狀態</label>
+          <select id="noStatus" style="width:100%">
+            <option value="pending">待確認</option>
+            <option value="processing">處理中</option>
+            <option value="shipped">已出貨</option>
+            <option value="delivered">已送達</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-row">
+          <label>訂單編號 *</label>
+          <input type="text" id="noOrderId" placeholder="輸入訂單編號">
+        </div>
+        <div class="form-row">
+          <label>下單日期</label>
+          <input type="date" id="noOrderDate">
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
+        <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem">👤 買家與配送資訊</div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>買家姓名</label>
+            <input type="text" id="noBuyerName" placeholder="收件人姓名">
+          </div>
+          <div class="form-row">
+            <label>電話號碼</label>
+            <input type="text" id="noBuyerPhone" placeholder="手機號碼">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>收件地址</label>
+          <input type="text" id="noAddress" placeholder="完整收件地址">
+        </div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>Email</label>
+            <input type="text" id="noEmail" placeholder="電子信箱（選填）">
+          </div>
+          <div class="form-row">
+            <label>配送方式</label>
+            <input type="text" id="noShipping" placeholder="例：宅急便、超商取貨">
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+          <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">🛍 商品資訊</div>
+          <button type="button" class="btn btn-sm" onclick="noAddItem()">＋ 新增商品</button>
+        </div>
+        <div id="noItemList"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
+        <div class="form-grid">
+          <div class="form-row">
+            <label>訂單金額</label>
+            <input type="number" id="noAmount" placeholder="0" oninput="noUpdateAmount()">
+          </div>
+          <div class="form-row">
+            <label style="display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="noAutoCalc" checked onchange="noUpdateAmount()">
+              自動加總商品金額
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>客戶備註</label>
+          <input type="text" id="noCustomerNote" placeholder="客戶備註（選填）">
+        </div>
+        <div class="form-row">
+          <label>內部備註</label>
+          <input type="text" id="noVendorNote" placeholder="內部備註（選填）">
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer" style="flex-shrink:0">
+      <button class="btn" onclick="closeModal('newOrderModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveNewOrder()">✅ 儲存訂單</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editModal">
   <div class="modal">
     <div class="modal-header">
@@ -4704,6 +4810,162 @@ async function saveDrawerEdit() {
 
 function openEditFromDrawer() {
   if (drawerOrderId) openEditModal(drawerOrderId);
+}
+
+
+// ==================== NEW ORDER (MANUAL) ====================
+let _noItemCount = 0;
+
+function openNewOrderModal() {
+  // Populate platform select
+  const sel = document.getElementById('noPlat');
+  sel.innerHTML = '<option value="">— 選擇平台 —</option>' +
+    Object.keys(PLATFORMS).map(k => `<option value="${k}">${PLATFORMS[k].label}</option>`).join('');
+
+  // Reset fields
+  document.getElementById('noOrderId').value    = '';
+  document.getElementById('noOrderDate').value  = new Date().toISOString().slice(0, 10);
+  document.getElementById('noBuyerName').value  = '';
+  document.getElementById('noBuyerPhone').value = '';
+  document.getElementById('noAddress').value    = '';
+  document.getElementById('noEmail').value      = '';
+  document.getElementById('noShipping').value   = '';
+  document.getElementById('noAmount').value     = '';
+  document.getElementById('noCustomerNote').value = '';
+  document.getElementById('noVendorNote').value   = '';
+  document.getElementById('noStatus').value     = 'pending';
+  document.getElementById('noAutoCalc').checked = true;
+  document.getElementById('noItemList').innerHTML = '';
+  _noItemCount = 0;
+  noAddItem(); // start with one empty item
+
+  document.getElementById('newOrderModal').classList.add('show');
+  setTimeout(() => document.getElementById('noOrderId').focus(), 100);
+}
+
+function noUpdateOrderId() {
+  // Auto-suggest order id prefix based on platform
+  const plat = document.getElementById('noPlat').value;
+  const field = document.getElementById('noOrderId');
+  if (!field.value && plat) {
+    field.placeholder = `${PLATFORMS[plat]?.label || plat}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`;
+  }
+}
+
+function noAddItem() {
+  const idx = _noItemCount++;
+  const el = document.createElement('div');
+  el.id = `noItem_${idx}`;
+  el.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;position:relative';
+  el.innerHTML = `
+    <button type="button" onclick="noRemoveItem(${idx})"
+      style="position:absolute;top:6px;right:8px;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text3);padding:0;line-height:1">×</button>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div class="form-row" style="margin-bottom:0">
+        <label style="font-size:11.5px">商品名稱</label>
+        <input type="text" id="noItemName_${idx}" placeholder="商品名稱" oninput="noUpdateAmount()">
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label style="font-size:11.5px">規格</label>
+        <input type="text" id="noItemSpec_${idx}" placeholder="規格（選填）">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row" style="margin-bottom:0">
+        <label style="font-size:11.5px">數量</label>
+        <input type="number" id="noItemQty_${idx}" placeholder="1" min="1" value="1" oninput="noUpdateAmount()">
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label style="font-size:11.5px">單價</label>
+        <input type="number" id="noItemPrice_${idx}" placeholder="0" min="0" oninput="noUpdateAmount()">
+      </div>
+    </div>`;
+  document.getElementById('noItemList').appendChild(el);
+}
+
+function noRemoveItem(idx) {
+  const el = document.getElementById(`noItem_${idx}`);
+  if (el) el.remove();
+  noUpdateAmount();
+}
+
+function noUpdateAmount() {
+  if (!document.getElementById('noAutoCalc')?.checked) return;
+  let total = 0;
+  for (let i = 0; i < _noItemCount; i++) {
+    const qty   = parseFloat(document.getElementById(`noItemQty_${i}`)?.value)   || 0;
+    const price = parseFloat(document.getElementById(`noItemPrice_${i}`)?.value) || 0;
+    total += qty * price;
+  }
+  if (total > 0) document.getElementById('noAmount').value = total;
+}
+
+async function saveNewOrder() {
+  const plat    = document.getElementById('noPlat').value;
+  const orderId = document.getElementById('noOrderId').value.trim();
+  if (!plat)    { alert('請選擇平台'); return; }
+  if (!orderId) { alert('請填寫訂單編號'); return; }
+
+  // Check duplicate order_id
+  if (orders.some(o => o.order_id === orderId && o.platform === plat)) {
+    if (!confirm(`平台「${PLATFORMS[plat]?.label}」已有相同訂單編號「${orderId}」，確定仍要新增？`)) return;
+  }
+
+  // Collect items
+  const items = [];
+  for (let i = 0; i < _noItemCount; i++) {
+    const nameEl = document.getElementById(`noItemName_${i}`);
+    if (!nameEl) continue; // removed
+    const name  = nameEl.value.trim();
+    const spec  = document.getElementById(`noItemSpec_${i}`)?.value.trim()  || '';
+    const qty   = document.getElementById(`noItemQty_${i}`)?.value          || '1';
+    const price = document.getElementById(`noItemPrice_${i}`)?.value        || '0';
+    if (!name) continue; // skip empty rows
+    items.push({ product_name: name, product_spec: spec, product_qty: qty, platform_qty: qty, unit_price: price, linked_products: [], linked_product_id: '' });
+  }
+
+  const amount = parseFloat(document.getElementById('noAmount').value) || 0;
+  const now    = new Date().toISOString();
+
+  const newOrder = {
+    id:               'order_' + Date.now(),
+    platform:         plat,
+    order_id:         orderId,
+    status:           document.getElementById('noStatus').value,
+    order_date:       document.getElementById('noOrderDate').value || now.slice(0, 10),
+    buyer_name:       document.getElementById('noBuyerName').value.trim(),
+    buyer_phone:      document.getElementById('noBuyerPhone').value.trim(),
+    buyer_email:      document.getElementById('noEmail').value.trim(),
+    shipping_address: document.getElementById('noAddress').value.trim(),
+    shipping_method:  document.getElementById('noShipping').value.trim(),
+    amount:           amount,
+    customer_note:    document.getElementById('noCustomerNote').value.trim(),
+    vendor_note:      document.getElementById('noVendorNote').value.trim(),
+    product_name:     items[0]?.product_name || '',
+    product_spec:     items[0]?.product_spec || '',
+    product_qty:      items[0]?.product_qty  || '',
+    platform_qty:     items[0]?.platform_qty || '',
+    items:            items.length > 1 ? items : [],
+    linked_products:  [],
+    linked_product_id:'',
+    is_merged_primary: false,
+    is_merged_secondary: false,
+    merged_from:      [],
+    merged_into:      '',
+    holding_area_id:  '',
+    tracking_number:  '',
+    note:             '',
+    created_at:       now,
+  };
+
+  orders.unshift(newOrder);
+  await saveOrder_DB(newOrder);
+  closeModal('newOrderModal');
+  renderOrders();
+  renderOrderPlatTabs();
+  renderDashboard();
+  updatePendingBadge();
+  alert(`✅ 訂單「${orderId}」已新增`);
 }
 
 function openEditModal(id) {
