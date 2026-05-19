@@ -1391,14 +1391,13 @@
         </div>
         <div class="form-row" style="margin-bottom:0">
           <label>訂單狀態篩選</label>
-          <select id="exportStatusFilter" onchange="previewVendorExport()" style="width:100%">
-            <option value="">全部狀態</option>
-            <option value="pending">待確認</option>
-            <option value="processing">處理中</option>
-            <option value="shipped">已出貨</option>
-            <option value="delivered">已送達</option>
-            <option value="cancelled">已取消</option>
-          </select>
+          <div id="exportStatusFilter" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;user-select:none" id="exportStatusLabel_pending"><input type="checkbox" class="export-status-cb" value="pending" onchange="updateExportStatusLabelStyle('pending');previewVendorExport()" style="accent-color:var(--accent)"> 待確認</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;user-select:none" id="exportStatusLabel_processing"><input type="checkbox" class="export-status-cb" value="processing" onchange="updateExportStatusLabelStyle('processing');previewVendorExport()" style="accent-color:var(--accent)"> 處理中</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;user-select:none" id="exportStatusLabel_shipped"><input type="checkbox" class="export-status-cb" value="shipped" onchange="updateExportStatusLabelStyle('shipped');previewVendorExport()" style="accent-color:var(--accent)"> 已出貨</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;user-select:none" id="exportStatusLabel_delivered"><input type="checkbox" class="export-status-cb" value="delivered" onchange="updateExportStatusLabelStyle('delivered');previewVendorExport()" style="accent-color:var(--accent)"> 已送達</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;user-select:none" id="exportStatusLabel_cancelled"><input type="checkbox" class="export-status-cb" value="cancelled" onchange="updateExportStatusLabelStyle('cancelled');previewVendorExport()" style="accent-color:var(--accent)"> 已取消</label>
+          </div>
         </div>
       </div>
 
@@ -5731,7 +5730,7 @@ function showVendorExportModal() {
   // Populate holding area checkboxes
   renderExportHoldingOptions();
 
-  document.getElementById('exportStatusFilter').value = '';
+  document.querySelectorAll('.export-status-cb').forEach(cb => { cb.checked = false; updateExportStatusLabelStyle(cb.value); });
   document.getElementById('vendorExportPreview').innerHTML = '';
   document.getElementById('vendorExportModal').classList.add('show');
 }
@@ -5796,6 +5795,14 @@ function updateExportPlatLabelStyle(p) {
   lbl.style.background  = cb.checked ? 'var(--accent-light)' : 'var(--surface2)';
 }
 
+function updateExportStatusLabelStyle(v) {
+  const cb  = document.querySelector(`.export-status-cb[value="${v}"]`);
+  const lbl = document.getElementById(`exportStatusLabel_${v}`);
+  if (!cb || !lbl) return;
+  lbl.style.borderColor = cb.checked ? 'var(--accent)' : 'var(--border)';
+  lbl.style.background  = cb.checked ? 'var(--accent-light)' : 'var(--surface2)';
+}
+
 function setExportDatePreset(preset) {
   const today = new Date();
   const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -5823,7 +5830,7 @@ function setExportDatePreset(preset) {
 function getExportFilteredOrders() {
   const dateFrom     = document.getElementById('exportDateFrom')?.value || '';
   const dateTo       = document.getElementById('exportDateTo')?.value   || '';
-  const statusFilter = document.getElementById('exportStatusFilter')?.value || '';
+  const selectedStatuses = [...document.querySelectorAll('.export-status-cb:checked')].map(cb => cb.value);
   const selectedPlats = [...document.querySelectorAll('.export-plat-cb:checked')].map(cb => cb.value);
   const vendorId     = document.getElementById('vendorExportSelect')?.value  || '';
   const holdingMode  = document.querySelector('input[name="exportHolding"]:checked')?.value || 'exclude_all';
@@ -5838,7 +5845,7 @@ function getExportFilteredOrders() {
       if (dateFrom && oDate < dateFrom) return false;
       if (dateTo   && oDate > dateTo)   return false;
     }
-    if (statusFilter && o.status !== statusFilter) return false;
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(o.status)) return false;
     if (selectedPlats.length > 0 && !selectedPlats.includes(o.platform)) return false;
     if (holdingMode === 'exclude_all' && o.holding_area_id) return false;
     if (holdingMode === 'select') {
