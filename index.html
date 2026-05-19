@@ -5704,7 +5704,11 @@ function setExportType(type, el) {
 
 function showVendorExportModal() {
   const today = new Date().toISOString().slice(0, 10);
-  document.getElementById('exportDatePicker').value = today;
+  // Set default date range to today
+  const fromEl = document.getElementById('exportDateFrom');
+  const toEl   = document.getElementById('exportDateTo');
+  if (fromEl) fromEl.value = today;
+  if (toEl)   toEl.value   = today;
   _exportType = 'vendor';
   document.querySelectorAll('.export-type-card').forEach((c,i) => c.classList.toggle('active', i===0));
 
