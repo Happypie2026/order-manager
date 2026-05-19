@@ -4557,18 +4557,16 @@ function populateDrawerEditForm(id) {
 
 function removeDrawerItem(itemIdx) {
   if (!confirm('確定要刪除這筆商品？')) return;
-  const o = orders.find(x => x.id === _drawerEditOrderId);
+  const o = orders.find(x => x.id === drawerOrderId);
   if (!o) return;
   const items = getOrderItems(o);
   items.splice(itemIdx, 1);
-  // Update the order's items array
-  const idx = orders.findIndex(x => x.id === _drawerEditOrderId);
+  const idx = orders.findIndex(x => x.id === drawerOrderId);
   if (idx >= 0) {
     orders[idx] = { ...orders[idx], items };
   }
-  // Re-render the edit drawer items section by re-populating the form
   _deItemCounter = 0;
-  populateDrawerEditForm(_drawerEditOrderId);
+  populateDrawerEditForm(drawerOrderId);
 }
 
 function addDrawerProductItem(preProductId, preQty, itemIdx) {
