@@ -1402,9 +1402,9 @@
         </div>
         <div class="form-row" style="margin-bottom:0">
           <label>訂單來源（平台）</label>
-          <select id="exportPlatFilter" onchange="previewVendorExport()" style="width:100%">
-            <option value="">全部平台</option>
-          </select>
+          <div id="exportPlatFilter" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <!-- populated by JS -->
+          </div>
         </div>
       </div>
 
@@ -5704,11 +5704,18 @@ function showVendorExportModal() {
   vendors.forEach(v => sel.add(new Option(v.name, v.id)));
   sel.value = '';
 
-  // Populate platform dropdown
-  const platSel = document.getElementById('exportPlatFilter');
-  while (platSel.options.length > 1) platSel.remove(1);
+  // Populate platform checkboxes (multi-select)
+  const platContainer = document.getElementById('exportPlatFilter');
   const usedPlats = [...new Set(orders.map(o => o.platform).filter(Boolean))];
-  usedPlats.forEach(p => platSel.add(new Option(PLATFORMS[p]?.label || p, p)));
+  platContainer.innerHTML = usedPlats.map(p => `
+    <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;
+      background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);
+      padding:5px 10px;user-select:none" id="exportPlatLabel_${p}">
+      <input type="checkbox" class="export-plat-cb" value="${p}"
+        onchange="updateExportPlatLabelStyle('${p}');previewVendorExport()"
+        style="accent-color:var(--accent)">
+      ${PLATFORMS[p]?.label || p}
+    </label>`).join('');
 
   // Populate holding area checkboxes
   renderExportHoldingOptions();
@@ -5770,9 +5777,17 @@ function getItemsForVendor(o, vendorId) {
   return result;
 }
 
+function updateExportPlatLabelStyle(p) {
+  const cb  = document.querySelector(`.export-plat-cb[value="${p}"]`);
+  const lbl = document.getElementById(`exportPlatLabel_${p}`);
+  if (!cb || !lbl) return;
+  lbl.style.borderColor = cb.checked ? 'var(--accent)' : 'var(--border)';
+  lbl.style.background  = cb.checked ? 'var(--accent-light)' : 'var(--surface2)';
+}
+
 function getExportFilteredOrders(dateStr) {
   const statusFilter = document.getElementById('exportStatusFilter')?.value || '';
-  const platFilter   = document.getElementById('exportPlatFilter')?.value   || '';
+  const selectedPlats = [...document.querySelectorAll('.export-plat-cb:checked')].map(cb => cb.value);
   const vendorId     = document.getElementById('vendorExportSelect')?.value  || '';
   const holdingMode  = document.querySelector('input[name="exportHolding"]:checked')?.value || 'exclude_all';
   const selectedHAs  = holdingMode === 'select'
@@ -5783,7 +5798,7 @@ function getExportFilteredOrders(dateStr) {
     if (o.is_merged_secondary) return false;
     if (dateStr && (o.created_at || '').slice(0, 10) !== dateStr) return false;
     if (statusFilter && o.status !== statusFilter) return false;
-    if (platFilter && o.platform !== platFilter) return false;
+    if (selectedPlats.length > 0 && !selectedPlats.includes(o.platform)) return false;
     if (holdingMode === 'exclude_all' && o.holding_area_id) return false;
     if (holdingMode === 'select') {
       if (o.holding_area_id && !selectedHAs.includes(o.holding_area_id)) return false;
