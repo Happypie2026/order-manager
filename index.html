@@ -5897,9 +5897,15 @@ function previewRow(name, count) {
 }
 
 function doVendorExport() {
-  const dateFrom = document.getElementById('exportDateFrom')?.value;
-  const dateTo   = document.getElementById('exportDateTo')?.value;
+  const dateFrom = document.getElementById('exportDateFrom')?.value || '';
+  const dateTo   = document.getElementById('exportDateTo')?.value   || '';
   const vendorId = document.getElementById('vendorExportSelect')?.value;
+  // Build a label string for filenames
+  const dateLabel = dateFrom && dateTo && dateFrom === dateTo
+    ? dateFrom
+    : dateFrom || dateTo
+      ? `${dateFrom || ''}~${dateTo || ''}`
+      : 'all';
 
   const allFiltered = getExportFilteredOrders();
 
@@ -5910,19 +5916,19 @@ function doVendorExport() {
     targetVendors.forEach(v => {
       const rows = allFiltered.filter(o => orderBelongsToVendor(o, v.id));
       if (!rows.length) return;
-      exportVendorExcelRows(v.name, rows, dateStr);
+      exportVendorExcelRows(v.name, rows, dateLabel);
       exported++;
     });
     if (!exported) { alert('沒有符合條件的訂單可匯出'); return; }
   } else if (_exportType === 'hsinchu') {
     if (!allFiltered.length) { alert('沒有符合條件的訂單可匯出'); return; }
-    exportHsinchu(allFiltered, dateStr);
+    exportHsinchu(allFiltered, dateLabel);
   } else if (_exportType === 'blackcat_warm') {
     if (!allFiltered.length) { alert('沒有符合條件的訂單可匯出'); return; }
-    exportBlackCat(allFiltered, dateStr, 'warm');
+    exportBlackCat(allFiltered, dateLabel, 'warm');
   } else if (_exportType === 'blackcat_cold') {
     if (!allFiltered.length) { alert('沒有符合條件的訂單可匯出'); return; }
-    exportBlackCat(allFiltered, dateStr, 'cold');
+    exportBlackCat(allFiltered, dateLabel, 'cold');
   }
 
   closeModal('vendorExportModal');
