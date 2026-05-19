@@ -4511,7 +4511,10 @@ function populateDrawerEditForm(id) {
               ${it._source_order_id?`<span style="font-size:10.5px;color:var(--text3)">來自 ${it._source_order_id}</span>`:''}
             </div>
           </div>
-          <button onclick="addDrawerProductItem(null,null,${itemIdx})" class="btn btn-sm" style="font-size:11px;padding:2px 8px;flex-shrink:0">＋ 新增對應</button>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <button onclick="addDrawerProductItem(null,null,${itemIdx})" class="btn btn-sm" style="font-size:11px;padding:2px 8px">＋ 新增對應</button>
+            <button onclick="removeDrawerItem(${itemIdx})" class="btn btn-sm" style="font-size:11px;padding:2px 8px;background:var(--danger-light);color:var(--danger);border-color:#f5c6c6" title="刪除此商品">🗑</button>
+          </div>
         </div>
         <div style="padding:10px 12px">
           <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">↳ 出貨對應商品</div>
@@ -4550,6 +4553,22 @@ function populateDrawerEditForm(id) {
       addDrawerProductItem(null, null, null);
     }
   }
+}
+
+function removeDrawerItem(itemIdx) {
+  if (!confirm('確定要刪除這筆商品？')) return;
+  const o = orders.find(x => x.id === _drawerEditOrderId);
+  if (!o) return;
+  const items = getOrderItems(o);
+  items.splice(itemIdx, 1);
+  // Update the order's items array
+  const idx = orders.findIndex(x => x.id === _drawerEditOrderId);
+  if (idx >= 0) {
+    orders[idx] = { ...orders[idx], items };
+  }
+  // Re-render the edit drawer items section by re-populating the form
+  _deItemCounter = 0;
+  populateDrawerEditForm(_drawerEditOrderId);
 }
 
 function addDrawerProductItem(preProductId, preQty, itemIdx) {
