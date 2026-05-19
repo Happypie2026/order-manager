@@ -42,7 +42,6 @@
     --fpg: #16a085; --fpg-bg: #e8f8f5;
     --website: #34495e; --website-bg: #ebedef;
     --kangcheng: #d35400; --kangcheng-bg: #fdf2e9;
-    --mahe: #c0392b; --mahe-bg: #fdf0f0;
     --radius: 10px;
     --radius-sm: 6px;
     --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
@@ -132,7 +131,6 @@
   .plat-fpg     { background: var(--fpg-bg);      color: var(--fpg); }
   .plat-website { background: var(--website-bg);  color: var(--website); }
   .plat-kangcheng { background: var(--kangcheng-bg); color: var(--kangcheng); }
-  .plat-mahe { background: var(--mahe-bg); color: var(--mahe); }
 
   /* Status */
   .status-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 2px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
@@ -585,10 +583,6 @@
         <div class="card-title">待處理事項</div>
         <div id="todoList"></div>
       </div>
-      <div class="card card-pad mb-3">
-        <div class="card-title">各平台訂單數</div>
-        <div class="bar-chart" id="platChart"></div>
-      </div>
       <div class="card card-pad">
         <div class="card-title flex justify-between items-center">
           <span>最新訂單</span>
@@ -638,7 +632,6 @@
           <div class="plat-tab"        data-plat="fpg"       onclick="selectImportPlat('fpg',this)">台塑</div>
           <div class="plat-tab"        data-plat="website"   onclick="selectImportPlat('website',this)">官網</div>
           <div class="plat-tab"        data-plat="kangcheng" onclick="selectImportPlat('kangcheng',this)">康承</div>
-          <div class="plat-tab"        data-plat="mahe"      onclick="selectImportPlat('mahe',this)">瑪黑</div>
         </div>
         <div id="platformHint" class="alert alert-info" style="margin-bottom:0"></div>
         <div style="margin-top:1rem" class="btn-row">
@@ -735,7 +728,6 @@
               <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="renderOrders()" onkeydown="if(event.key==='Enter')renderOrders()">
             </div>
             <select id="orderStatusFilter" onchange="renderOrders()">
-              <option value="__active__">待確認 ＋ 處理中</option>
               <option value="">全部狀態</option>
               <option value="pending">待確認</option>
               <option value="processing">處理中</option>
@@ -752,7 +744,6 @@
               <option value="amount_desc">金額高→低</option>
             </select>
             <button class="btn" onclick="refreshOrdersFromDB()" style="white-space:nowrap;flex-shrink:0">🔄 同步更新</button>
-            <button class="btn" onclick="openSmartMergeModal()" style="white-space:nowrap;flex-shrink:0;background:var(--info-light);color:var(--info);border-color:#b8d0ec;font-weight:500">🔍 篩選重複合併</button>
           </div>
 
           <!-- Batch bar — always visible, toggles active state -->
@@ -1195,37 +1186,6 @@
 </div>
 
 <!-- Stock Record Modal -->
-<!-- Delete Stock Modal -->
-<div class="modal-overlay" id="deleteStockModal">
-  <div class="modal" style="width:420px">
-    <div class="modal-header">
-      <div class="modal-title">🗑 刪除庫存</div>
-      <button class="modal-close" onclick="closeModal('deleteStockModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div id="deleteStockProductName" style="font-size:15px;font-weight:600;margin-bottom:4px"></div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:1.25rem">
-        目前庫存：<span id="deleteStockCurrentQty" style="font-weight:700;color:var(--text)"></span> 件
-      </div>
-      <div class="alert alert-warning" style="margin-bottom:1rem">
-        ⚠️ 此操作會新增一筆「負數進貨」來修正庫存，用於修正誤進貨數量。
-      </div>
-      <div class="form-row">
-        <label>要扣除的數量 *</label>
-        <input type="number" id="deleteStockQty" min="1" placeholder="請輸入要扣除的件數" style="font-size:15px">
-      </div>
-      <div class="form-row">
-        <label>備註（選填）</label>
-        <input type="text" id="deleteStockNote" placeholder="例：誤進貨退回、庫存調整…">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('deleteStockModal')">取消</button>
-      <button class="btn btn-danger" onclick="confirmDeleteStock()">確認扣除</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="stockModal">
   <div class="modal" style="width:480px">
     <div class="modal-header">
@@ -1552,71 +1512,6 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('batchHoldModal')">取消</button>
-    </div>
-  </div>
-</div>
-
-<!-- Smart Merge Modal -->
-<div class="modal-overlay" id="smartMergeModal">
-  <div class="modal" style="width:720px;max-height:92vh;display:flex;flex-direction:column">
-    <div class="modal-header" style="flex-shrink:0">
-      <div class="modal-title">🔍 篩選重複合併</div>
-      <button class="modal-close" onclick="closeModal('smartMergeModal')">×</button>
-    </div>
-    <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:0">
-
-      <!-- Step 1: filter criteria -->
-      <div id="smartMergeStep1">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:1rem">
-          選擇要比對的欄位，系統會自動找出資料相同的訂單，讓你決定要不要合併。
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem">
-          <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;user-select:none" id="smCritLabel_name">
-            <input type="checkbox" id="smCrit_name" checked onchange="smartMergeUpdateCriteriaStyle()"> 收件人姓名
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;user-select:none" id="smCritLabel_phone">
-            <input type="checkbox" id="smCrit_phone" checked onchange="smartMergeUpdateCriteriaStyle()"> 電話號碼
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;user-select:none" id="smCritLabel_address">
-            <input type="checkbox" id="smCrit_address" checked onchange="smartMergeUpdateCriteriaStyle()"> 收件地址
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;user-select:none" id="smCritLabel_email">
-            <input type="checkbox" id="smCrit_email" onchange="smartMergeUpdateCriteriaStyle()"> Email
-          </label>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-          <div style="flex:1;min-width:180px">
-            <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px">篩選訂單狀態</label>
-            <select id="smStatusFilter" style="width:100%">
-              <option value="">全部狀態</option>
-              <option value="pending" selected>待確認</option>
-              <option value="processing">處理中</option>
-              <option value="shipped">已出貨</option>
-            </select>
-          </div>
-          <div style="flex:1;min-width:180px">
-            <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px">篩選平台</label>
-            <select id="smPlatFilter" style="width:100%">
-              <option value="">全部平台</option>
-            </select>
-          </div>
-        </div>
-        <button class="btn btn-primary" onclick="runSmartMergeScan()" style="width:100%">🔍 開始掃描</button>
-      </div>
-
-      <!-- Step 2: results -->
-      <div id="smartMergeStep2" style="display:none">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
-          <button class="btn btn-sm" onclick="smartMergeBackToStep1()">← 重新設定</button>
-          <div id="smartMergeSummary" style="font-size:13px;color:var(--text2)"></div>
-        </div>
-        <div id="smartMergeGroups"></div>
-      </div>
-
-    </div>
-    <div class="modal-footer" style="flex-shrink:0">
-      <button class="btn" onclick="closeModal('smartMergeModal')">關閉</button>
-      <button class="btn btn-primary" id="smartMergeConfirmBtn" style="display:none" onclick="confirmSmartMergeAll()">合併所有已勾選的組別</button>
     </div>
   </div>
 </div>
@@ -1990,9 +1885,8 @@ const PLATFORMS = {
   eslite:  { label: '誠品',      color: '#2c3e50', hint: '後台路徑：誠品線上賣家後台 → 訂單管理 → 訂單查詢 → 匯出' },
   payeasy: { label: 'PayEasy',   color: '#8e44ad', hint: '後台路徑：PayEasy賣家後台 → 訂單管理 → 匯出訂單' },
   fpg:     { label: '台塑',      color: '#16a085', hint: '後台路徑：台塑購物賣家後台 → 訂單查詢 → 匯出' },
-  website: { label: '官網',      color: '#34495e', hint: '官網後台 → 訂單管理 → 訂單列表 → 匯出 CSV ⚠️ 官網格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
+  website: { label: '官網',      color: '#34495e', hint: '官網後台 → 訂單管理 → 訂單列表 → 匯出 CSV' },
   kangcheng: { label: '康承',    color: '#d35400', hint: '後台路徑：康承賣家後台 → 訂單管理 → 訂單查詢 → 匯出 ⚠️ 康承格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
-  mahe:    { label: '瑪黑',      color: '#c0392b', hint: '後台路徑：瑪黑賣家後台 → 訂單管理 → 訂單列表 → 匯出 CSV' },
 };
 
 // Base field definitions (all possible fields)
@@ -2028,16 +1922,15 @@ const PLATFORM_REQUIRED = {
   books:      ['order_id','buyer_name','buyer_phone','shipping_address','product_name',               'product_qty','amount'],
   fresh:      ['order_id','buyer_name','buyer_phone','shipping_address','product_name','product_spec','product_qty','amount'],
   payeasy:    ['order_id','buyer_name','buyer_phone','shipping_address','product_name',               'product_qty','amount'],
-  website:    ['order_id','buyer_name','buyer_phone','shipping_address'],  // 多列格式：商品資料在後續列
+  website:    ['order_id','buyer_name','buyer_phone','shipping_address','product_name',               'product_qty','amount'],
   eslite:     ['order_id','buyer_name','buyer_phone','shipping_city','shipping_district','shipping_detail','product_name','product_qty','amount'],
   fpg:        ['order_id','buyer_name','buyer_phone_landline','buyer_phone_mobile','shipping_address','product_name','product_spec','product_qty','amount'],
   // 康承: 訂單編號+買家+地址+電話必填；金額/商品/規格選填（格式特殊，多列合併）
   kangcheng:  ['order_id','buyer_name','buyer_phone','shipping_address'],
-  mahe:       ['order_id','buyer_name','buyer_phone','shipping_address','product_name','product_qty','amount'],
 };
 
 // Platforms where multiple CSV rows = one order (client data on first row, product rows below with blank order_id)
-const MULTI_ROW_PLATFORMS = new Set(['kangcheng', 'website']);
+const MULTI_ROW_PLATFORMS = new Set(['kangcheng']);
 
 // Per-platform extra fields (replaces default buyer_phone / shipping_address with split versions)
 const PLATFORM_EXTRA_FIELDS = {
@@ -2066,8 +1959,8 @@ function getFieldsForPlatform(platId) {
     // Address: single or split
     ...(useSplitAddr ? ['shipping_city','shipping_district','shipping_detail'] : ['shipping_address']),
     'product_name',
-    // 康承、官網不需要商品規格欄位（格式已含在商品名稱內）
-    ...(platId === 'kangcheng' || platId === 'website' ? [] : ['product_spec']),
+    // 康承不需要商品規格欄位
+    ...(platId === 'kangcheng' ? [] : ['product_spec']),
     'product_qty',
     // Platform-specific extras (shipping_interval for fresh)
     ...extraKeys.filter(k => !['shipping_city','shipping_district','shipping_detail','buyer_phone_landline','buyer_phone_mobile'].includes(k)),
@@ -2453,7 +2346,7 @@ function showOrdersView(view) {
   const statusSel = document.getElementById('orderStatusFilter');
 
   if (view === 'active') {
-    if (statusSel) statusSel.value = '__active__'; // pending + processing only
+    if (statusSel) statusSel.value = '';
     orderFilter.holdingAreaId = '__none__';
   } else if (view === 'shipped') {
     if (statusSel) statusSel.value = 'shipped';
@@ -2819,7 +2712,6 @@ function showPage(id) {
     if (_currentInventoryView === 'records') renderStockRecords();
     else renderStockSummary();
   }
-  if (id === 'settings') renderAccounts();
 }
 
 // ==================== DASHBOARD ====================
@@ -3047,9 +2939,9 @@ function buildMappingUI(hasSaved) {
 
 function guessColumn(key, headers) {
   const guesses = {
-    order_id:              ['訂單編號','訂單號碼','Order No','order_id','訂單ID','匯入單號','自訂編號'],
-    buyer_name:            ['收件人','買家姓名','收件姓名','姓名','buyer_name','客戶名稱'],
-    amount:                ['訂單金額','買家實付金額','訂單總金額','總金額','金額','amount','發票金額','折扣前總金額'],
+    order_id:              ['訂單編號','訂單號碼','Order No','order_id','訂單ID'],
+    buyer_name:            ['收件人','買家姓名','收件姓名','姓名','buyer_name'],
+    amount:                ['訂單金額','買家實付金額','訂單總金額','總金額','金額','amount'],
     product_name:          ['商品名稱','品名','商品品名','商品','product_name','item_name','品項名稱'],
     product_spec:          ['商品規格','規格','顏色尺寸','款式','spec','variation','商品屬性','sku'],
     product_qty:           ['數量','購買數量','商品數量','qty','quantity','件數'],
@@ -3057,16 +2949,16 @@ function guessColumn(key, headers) {
     vendor_note:           ['廠商端備註','廠商備註','賣家備註','內部備註','廠商說明','vendor_note','seller_note'],
     shipping_interval:     ['出貨區間','出貨時間','配送區間','出貨日期區間','出貨日','預計出貨','ship_interval'],
     status:                ['訂單狀態','訂購狀態','狀態','status'],
-    order_date:            ['下單時間','訂單時間','訂購時間','建立時間','created_at','訂單建立時間'],
-    shipping_address:      ['收件地址','收貨地址','地址','address','客戶地址'],
+    order_date:            ['下單時間','訂單時間','訂購時間','建立時間','created_at'],
+    shipping_address:      ['收件地址','收貨地址','地址','address'],
     shipping_city:         ['縣市','city','收件縣市','地區縣市','行政縣市'],
     shipping_district:     ['鄉鎮市區','鄉鎮','district','收件鄉鎮','行政區'],
     shipping_detail:       ['詳細地址','街道','門牌','地址明細','detail','地址(不含縣市鄉鎮)'],
-    shipping_method:       ['配送方式','運送方式','物流','shipping','物流方式'],
-    buyer_phone:           ['電話','手機','連絡電話','phone','電話號碼','客戶手機號碼'],
+    shipping_method:       ['配送方式','運送方式','物流','shipping'],
+    buyer_phone:           ['電話','手機','連絡電話','phone','電話號碼'],
     buyer_phone_landline:  ['市話','聯絡市話','住宅電話','landline','電話(市話)'],
     buyer_phone_mobile:    ['手機','聯絡手機','行動電話','mobile','手機號碼'],
-    buyer_email:           ['Email','電子信箱','mail','客戶電子信箱'],
+    buyer_email:           ['Email','電子信箱','mail'],
     tracking_number:       ['追蹤號','物流號碼','運單號','tracking'],
   };
   const candidates = guesses[key] || [];
@@ -3486,22 +3378,7 @@ function resetImport() { _workbook = null; setImportStep(1); document.getElement
 
 // ==================== ORDERS ====================
 function renderOrderPlatTabs() {
-  const haId = orderFilter.holdingAreaId;
-  const st   = document.getElementById('orderStatusFilter')?.value || '';
-  const visible = orders.filter(o => {
-    if (o.is_merged_secondary) return false;
-    // Apply same status filter as current view
-    if (st === '__active__') {
-      if (o.status !== 'pending' && o.status !== 'processing') return false;
-    } else if (st) {
-      if (o.status !== st) return false;
-    }
-    // Apply same holding area filter as current view
-    if (haId === '__none__')        { if (o.holding_area_id) return false; }
-    else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
-    else if (haId)                  { if (o.holding_area_id !== haId) return false; }
-    return true;
-  });
+  const visible = orders.filter(o => !o.is_merged_secondary);
   const counts = { all: visible.length };
   Object.keys(PLATFORMS).forEach(k => counts[k] = visible.filter(o => o.platform === k).length);
   const tabs = [{ key: 'all', label: '全部', count: counts.all }, ...Object.keys(PLATFORMS).map(k => ({ key: k, label: PLATFORMS[k].label, count: counts[k] }))];
@@ -3533,11 +3410,7 @@ function renderOrders() {
     if (o.is_merged_secondary) return false;
 
     if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
-    if (st === '__active__') {
-      if (o.status !== 'pending' && o.status !== 'processing') return false;
-    } else if (st) {
-      if (o.status !== st) return false;
-    }
+    if (st && o.status !== st) return false;
 
     // Holding area filter
     if (haId) {
@@ -3595,7 +3468,7 @@ function renderOrders() {
           ? `<span style="background:var(--info-light);color:var(--info);font-size:11px;padding:1px 6px;border-radius:10px;font-weight:600">${allItems.length} 項商品</span>`
           : (o.product_name ? `<span title="${o.product_name}">${o.product_name.slice(0,16)}${o.product_name.length>16?'…':''}</span>` : '<span style="color:var(--text3)">-</span>');
 
-        return `<tr style="background:${rowBg}">
+        return `<tr data-oid="${o.id}" style="background:${rowBg}">
           <td><input type="checkbox" ${selectedOrders.has(o.id)?'checked':''} onchange="toggleSelect('${o.id}',this)" style="accent-color:var(--accent)"></td>
           <td data-label="訂單編號" class="mono" style="font-size:12px">
             ${o.order_id}
@@ -3640,32 +3513,22 @@ function toggleSelect(id, cb) {
 }
 
 function toggleSelectAll(cb) {
-  const q      = (document.getElementById('orderSearch')?.value || '').toLowerCase();
-  const st     = document.getElementById('orderStatusFilter')?.value || '';
-  const vendId = document.getElementById('orderVendorFilter')?.value || '';
-  const haId   = orderFilter.holdingAreaId;
-  let filtered = orders.filter(o => {
-    if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
-    if (st && o.status !== st) return false;
-    if (haId) {
-      if (haId === '__none__') { if (o.holding_area_id) return false; }
-      else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
-      else { if (o.holding_area_id !== haId) return false; }
-    }
-    if (vendId) {
-      const pids = (o.linked_products||[]).map(l=>l.product_id).concat(o.linked_product_id||'').filter(Boolean);
-      if (!pids.some(pid => products.find(x=>x.id===pid)?.vendor_id===vendId)) return false;
-    }
-    if (q && !(o.order_id||'').toLowerCase().includes(q) && !(o.buyer_name||'').toLowerCase().includes(q) && !(o.product_name||'').toLowerCase().includes(q)) return false;
-    // Skip locked orders when global select-all
-    const ha = holdingAreas.find(h => h.id === o.holding_area_id);
-    if (ha?.locked && cb.checked) return false;
-    return true;
+  // Get the currently rendered order IDs from the table rows
+  const rendered = [...document.querySelectorAll('#ordersBody tr[data-oid]')]
+    .map(tr => tr.dataset.oid)
+    .filter(Boolean);
+
+  if (cb.checked) {
+    rendered.forEach(id => selectedOrders.add(id));
+  } else {
+    // Clear all selected (across all pages)
+    selectedOrders.clear();
+  }
+  // Update individual checkboxes
+  document.querySelectorAll('#ordersBody input[type=checkbox]').forEach(el => {
+    el.checked = cb.checked;
   });
-  const slice = filtered.slice((orderFilter.page - 1) * PER_PAGE, orderFilter.page * PER_PAGE);
-  if (cb.checked) slice.forEach(o => selectedOrders.add(o.id));
-  else filtered.forEach(o => selectedOrders.delete(o.id));
-  renderOrders();
+  updateBatchBar();
 }
 
 function updateBatchBar() {
@@ -3848,237 +3711,6 @@ function batchMoveToHoldingArea(haId) {
 
 // ==================== MERGE ORDERS ====================
 let _mergeSelectedPrimary = null;
-
-
-// ==================== SMART MERGE ====================
-let _smartMergeGroups = []; // [{ key, orders: [], willMerge: bool, primaryId }]
-
-function openSmartMergeModal() {
-  // Populate platform filter
-  const platSel = document.getElementById('smPlatFilter');
-  platSel.innerHTML = '<option value="">全部平台</option>' +
-    Object.keys(PLATFORMS).map(k => `<option value="${k}">${PLATFORMS[k].label}</option>`).join('');
-
-  document.getElementById('smartMergeStep1').style.display = '';
-  document.getElementById('smartMergeStep2').style.display = 'none';
-  document.getElementById('smartMergeConfirmBtn').style.display = 'none';
-  smartMergeUpdateCriteriaStyle();
-  document.getElementById('smartMergeModal').classList.add('show');
-}
-
-function smartMergeUpdateCriteriaStyle() {
-  ['name','phone','address','email'].forEach(k => {
-    const cb = document.getElementById('smCrit_' + k);
-    const lbl = document.getElementById('smCritLabel_' + k);
-    if (!cb || !lbl) return;
-    lbl.style.borderColor = cb.checked ? 'var(--accent)' : 'var(--border)';
-    lbl.style.background  = cb.checked ? 'var(--accent-light)' : 'var(--surface2)';
-    lbl.style.color       = cb.checked ? 'var(--accent-dark, var(--accent))' : '';
-  });
-}
-
-function smartMergeBackToStep1() {
-  document.getElementById('smartMergeStep1').style.display = '';
-  document.getElementById('smartMergeStep2').style.display = 'none';
-  document.getElementById('smartMergeConfirmBtn').style.display = 'none';
-}
-
-function runSmartMergeScan() {
-  const useName    = document.getElementById('smCrit_name').checked;
-  const usePhone   = document.getElementById('smCrit_phone').checked;
-  const useAddress = document.getElementById('smCrit_address').checked;
-  const useEmail   = document.getElementById('smCrit_email').checked;
-
-  if (!useName && !usePhone && !useAddress && !useEmail) {
-    alert('請至少選擇一個比對欄位');
-    return;
-  }
-
-  const statusFilter = document.getElementById('smStatusFilter').value;
-  const platFilter   = document.getElementById('smPlatFilter').value;
-
-  const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
-
-  // Filter orders
-  let pool = orders.filter(o => o.status !== 'cancelled');
-  if (statusFilter) pool = pool.filter(o => o.status === statusFilter);
-  if (platFilter)   pool = pool.filter(o => o.platform === platFilter);
-
-  // Build group key for each order
-  const grouped = {};
-  pool.forEach(o => {
-    const parts = [];
-    if (useName)    parts.push('n:' + norm(o.buyer_name));
-    if (usePhone)   parts.push('p:' + norm(o.buyer_phone));
-    if (useAddress) parts.push('a:' + norm(o.shipping_address));
-    if (useEmail)   parts.push('e:' + norm(o.buyer_email));
-    // Skip orders where all selected fields are empty
-    if (parts.every(p => p.endsWith(':') || p.split(':')[1] === '')) return;
-    const key = parts.join('|');
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(o);
-  });
-
-  // Only keep groups with 2+ orders
-  _smartMergeGroups = Object.entries(grouped)
-    .filter(([, grp]) => grp.length >= 2)
-    .map(([key, grpOrders]) => ({
-      key,
-      orders: grpOrders,
-      willMerge: true,
-      primaryId: grpOrders[0].id,
-    }));
-
-  renderSmartMergeResults();
-  document.getElementById('smartMergeStep1').style.display = 'none';
-  document.getElementById('smartMergeStep2').style.display = '';
-}
-
-function renderSmartMergeResults() {
-  const total = _smartMergeGroups.length;
-  const checked = _smartMergeGroups.filter(g => g.willMerge).length;
-
-  document.getElementById('smartMergeSummary').innerHTML =
-    total === 0
-      ? '<span style="color:var(--success)">✅ 沒有找到重複訂單</span>'
-      : `找到 <strong>${total}</strong> 組重複訂單，已勾選 <strong>${checked}</strong> 組`;
-
-  document.getElementById('smartMergeConfirmBtn').style.display = total > 0 ? '' : 'none';
-
-  if (total === 0) {
-    document.getElementById('smartMergeGroups').innerHTML =
-      '<div class="empty-state" style="padding:2rem 0"><div class="es-icon">🎉</div><p>沒有找到符合條件的重複訂單</p></div>';
-    return;
-  }
-
-  document.getElementById('smartMergeGroups').innerHTML = _smartMergeGroups.map((g, gi) => {
-    const totalAmt = g.orders.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
-    return `
-    <div style="border:2px solid ${g.willMerge ? 'var(--accent-mid)' : 'var(--border)'};border-radius:var(--radius);margin-bottom:14px;overflow:hidden;transition:border-color 0.15s" id="smGroup_${gi}">
-      <!-- Group header -->
-      <div style="background:${g.willMerge ? 'var(--accent-light)' : 'var(--surface2)'};padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background 0.15s" onclick="toggleSmartMergeGroup(${gi})">
-        <input type="checkbox" ${g.willMerge ? 'checked' : ''} onclick="event.stopPropagation();toggleSmartMergeGroup(${gi})" style="width:16px;height:16px;cursor:pointer">
-        <div style="flex:1">
-          <span style="font-size:13px;font-weight:700">第 ${gi+1} 組・${g.orders.length} 筆訂單</span>
-          <span style="font-size:12px;color:var(--text2);margin-left:8px">合併後金額：$${Math.round(totalAmt).toLocaleString()}</span>
-        </div>
-        <span style="font-size:12px;color:${g.willMerge ? 'var(--accent)' : 'var(--text3)'}">
-          ${g.willMerge ? '✅ 將合併' : '⏭ 略過'}
-        </span>
-      </div>
-
-      <!-- Order rows -->
-      <div style="padding:8px 14px">
-        ${g.orders.map(o => {
-          const isPrimary = o.id === g.primaryId;
-          const items = getOrderItems(o);
-          return `
-          <div style="border:1.5px solid ${isPrimary ? 'var(--accent-mid)' : 'var(--border)'};
-               background:${isPrimary ? 'var(--accent-light)' : 'var(--surface)'};
-               border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;cursor:pointer;transition:all 0.15s"
-               onclick="setSmartMergePrimary(${gi},'${o.id}')">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <div style="width:16px;height:16px;border-radius:50%;border:2px solid ${isPrimary ? 'var(--accent)' : 'var(--border2)'};
-                   background:${isPrimary ? 'var(--accent)' : 'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                ${isPrimary ? '<svg width="9" height="9" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>' : ''}
-              </div>
-              <div style="font-size:13px;font-weight:600">${o.order_id} &nbsp;${platTag(o.platform)}</div>
-              <div style="font-size:12px;color:var(--text2);margin-left:auto">$${(parseFloat(o.amount)||0).toLocaleString()}</div>
-              ${isPrimary ? '<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 7px;border-radius:8px;font-weight:700">主訂單</span>' : ''}
-            </div>
-            <div style="font-size:12px;color:var(--text2);padding-left:24px;margin-bottom:2px">
-              👤 ${o.buyer_name||'-'} &nbsp;📞 ${o.buyer_phone||'-'}
-            </div>
-            ${o.shipping_address ? `<div style="font-size:11.5px;color:var(--text3);padding-left:24px;margin-bottom:4px">📍 ${o.shipping_address}</div>` : ''}
-            <div style="padding-left:24px">
-              ${items.map(it => `<span style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-right:4px;font-size:11.5px;display:inline-block;margin-bottom:2px">${it.product_name||'未知商品'}${it.product_spec?' · '+it.product_spec:''} ×${it.product_qty||1}</span>`).join('')}
-            </div>
-          </div>`;
-        }).join('')}
-        <div style="font-size:11.5px;color:var(--text3);padding:4px 2px">
-          💡 點擊訂單卡片可設為主訂單（保留該筆的買家資訊）
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function toggleSmartMergeGroup(gi) {
-  _smartMergeGroups[gi].willMerge = !_smartMergeGroups[gi].willMerge;
-  renderSmartMergeResults();
-}
-
-function setSmartMergePrimary(gi, orderId) {
-  _smartMergeGroups[gi].primaryId = orderId;
-  renderSmartMergeResults();
-}
-
-async function confirmSmartMergeAll() {
-  const toMerge = _smartMergeGroups.filter(g => g.willMerge);
-  if (!toMerge.length) { alert('沒有勾選任何組別'); return; }
-
-  const count = toMerge.reduce((s, g) => s + g.orders.length, 0);
-  if (!confirm(`確定要合併 ${toMerge.length} 組（共 ${count} 筆訂單）？此操作無法復原。`)) return;
-
-  let successCount = 0;
-  for (const g of toMerge) {
-    try {
-      // Snapshot the orders data NOW (before any mutation)
-      const groupOrders = g.orders.map(o => orders.find(x => x.id === o.id) || o);
-      const primaryOrder = groupOrders.find(o => o.id === g.primaryId) || groupOrders[0];
-      const otherOrders  = groupOrders.filter(o => o.id !== primaryOrder.id);
-
-      // Collect all items from all orders in group
-      const mergedItems = [];
-      groupOrders.forEach(o => {
-        getOrderItems(o).forEach(it => {
-          mergedItems.push({ ...it, _source_order_id: o.order_id });
-        });
-      });
-
-      const mergedAmount = groupOrders.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
-      const mergedOrderNos = otherOrders.map(o => o.order_id);
-
-      const mergedOrder = {
-        ...primaryOrder,
-        items: mergedItems,
-        amount: Math.round(mergedAmount),
-        is_merged_primary: true,
-        merged_from: mergedOrderNos,
-        vendor_note: [primaryOrder.vendor_note, ...otherOrders.map(o => o.vendor_note)].filter(Boolean).join(' | '),
-      };
-
-      // 1. Update primary in local orders array
-      const idx = orders.findIndex(o => o.id === mergedOrder.id);
-      if (idx >= 0) orders[idx] = mergedOrder; else orders.unshift(mergedOrder);
-
-      // 2. Mark secondaries as merged (same as confirmMerge) and remove from local array
-      otherOrders.forEach(o => {
-        orders = orders.filter(x => x.id !== o.id);
-      });
-
-      // 3. Persist to DB
-      await saveOrder_DB(mergedOrder);
-      for (const o of otherOrders) {
-        try {
-          await SB.delete('orders', o.id);
-        } catch(e) { console.warn('delete secondary:', e.message); }
-      }
-
-      localStorage.setItem('orders', JSON.stringify(orders));
-      successCount++;
-    } catch(e) {
-      console.error('合併失敗:', e);
-    }
-  }
-
-  closeModal('smartMergeModal');
-  renderOrders();
-  renderOrderPlatTabs();
-  renderDashboard();
-  updatePendingBadge();
-  alert(`✅ 成功合併 ${successCount} 組訂單`);
-}
 
 function openMergeModal() {
   const ids = [...selectedOrders];
@@ -4816,7 +4448,7 @@ function renderStockSummary() {
     const { perDay, sold30 } = calcSalesSpeed(p.id);
     const daysLeft = perDay > 0 ? Math.floor(current / perDay) : null;
     const alert = p.stock_alert || 10;
-    const isLow = false; // warning display disabled
+    const isLow = current <= alert;
     const v = vendors.find(vd => vd.id === p.vendor_id);
 
     const daysColor = daysLeft === null ? 'var(--text3)' : daysLeft < 7 ? 'var(--danger)' : daysLeft < 14 ? 'var(--warning)' : 'var(--success)';
@@ -4835,10 +4467,7 @@ function renderStockSummary() {
       <td style="text-align:center;color:var(--text2)">${perDay > 0 ? perDay + ' 件/天' : '—'}</td>
       <td style="text-align:center;font-weight:600;color:${daysColor}">${daysLeft !== null ? daysLeft + ' 天' : '—'}</td>
       <td style="text-align:right">
-        <div style="display:flex;gap:6px;justify-content:flex-end">
-          <button onclick="openStockModal('${p.id}')" class="btn btn-sm btn-primary" style="white-space:nowrap">＋ 進貨</button>
-          <button onclick="openDeleteStockModal('${p.id}')" class="btn btn-sm" style="white-space:nowrap;background:var(--danger-light);color:var(--danger);border-color:#f5c6c6">🗑 刪除庫存</button>
-        </div>
+        <button onclick="openStockModal('${p.id}')" class="btn btn-sm btn-primary" style="white-space:nowrap">＋ 進貨</button>
       </td>
     </tr>`;
   }).join('');
@@ -5157,53 +4786,6 @@ async function saveStockRecord() {
   closeModal('stockModal');
   renderStockSummary();
   renderStockRecords();
-}
-
-function openDeleteStockModal(productId) {
-  const p = products.find(x => x.id === productId);
-  if (!p) return;
-  const { current } = calcCurrentStock(productId);
-  document.getElementById('deleteStockProductName').textContent = p.name;
-  document.getElementById('deleteStockCurrentQty').textContent = current;
-  document.getElementById('deleteStockQty').value = '';
-  document.getElementById('deleteStockNote').value = '';
-  document.getElementById('deleteStockModal').dataset.productId = productId;
-  document.getElementById('deleteStockModal').classList.add('show');
-  setTimeout(() => document.getElementById('deleteStockQty').focus(), 100);
-}
-
-async function confirmDeleteStock() {
-  const productId = document.getElementById('deleteStockModal').dataset.productId;
-  const qty = parseInt(document.getElementById('deleteStockQty').value);
-  const note = document.getElementById('deleteStockNote').value.trim();
-
-  if (!qty || qty <= 0) {
-    alert('請輸入要扣除的數量（需大於 0）');
-    return;
-  }
-
-  const { current } = calcCurrentStock(productId);
-  if (qty > current) {
-    if (!confirm(`扣除數量（${qty}）大於目前庫存（${current}），庫存將變為負數，確定繼續？`)) return;
-  }
-
-  const record = {
-    id: 'sr_' + Date.now(),
-    product_id: productId,
-    qty: -qty,  // negative to reduce stock
-    unit_cost: 0,
-    note: note || '庫存調整（刪除）',
-    record_date: new Date().toISOString().slice(0, 10),
-    arrival_date: new Date().toISOString().slice(0, 10),
-    arrived: true,
-    created_at: new Date().toISOString(),
-  };
-
-  await saveStockRecordToDB(record);
-  closeModal('deleteStockModal');
-  renderStockSummary();
-  renderStockRecords();
-  renderDashboard();
 }
 
 async function deleteStockRecord(id) {
@@ -6024,29 +5606,10 @@ function exportBlackCat(rows, dateStr, temp) {
       nextDay(dateStr),          // 希望配達日 ← 匯出日期的隔天
       1,                         // 希望配合時段 (固定=1:13時前)
       1,                         // 品類代碼 (固定=1)
-      '',                        // 品名 (不填入)
+      prodDesc,                  // 品名
       'Y',                       // 易碎物品 (固定=Y)
       'N',                       // 精密儀器 (固定=N)
-      (() => {
-        // 備註 = 商品廠商簡稱（出貨用）+ 數量
-        const shortNameParts = [];
-        items.forEach(it => {
-          const linkedList = it.linked_products?.length
-            ? it.linked_products
-            : (it.linked_product_id ? [{ product_id: it.linked_product_id, qty: it.product_qty || it.platform_qty }] : []);
-          linkedList.forEach(li => {
-            const p = products.find(x => x.id === li.product_id);
-            const sn = p?.short_name || p?.name || '';
-            const q = li.qty || it.product_qty || it.platform_qty || '';
-            if (sn) shortNameParts.push(q ? `${sn}${q}` : sn);
-          });
-        });
-        if (!shortNameParts.length && o.product_name) {
-          const q = o.product_qty || o.platform_qty || '';
-          shortNameParts.push(q ? `${o.product_name}${q}` : o.product_name);
-        }
-        return shortNameParts.join('+') || '';
-      })(), // 備註
+      o.customer_note || o.vendor_note || '', // 備註
       '',                        // 報值(Y|N) 不填
       '',                        // 報值金額 (留空)
       'N',                       // 到付單 (固定=N)
