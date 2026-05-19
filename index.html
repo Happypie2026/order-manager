@@ -1375,8 +1375,19 @@
       <!-- Date + status -->
       <div class="form-grid">
         <div class="form-row" style="margin-bottom:0">
-          <label>匯出日期（依下單日期）</label>
-          <input type="date" id="exportDatePicker" onchange="previewVendorExport()">
+          <label>匯出日期範圍（依下單日期）</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="date" id="exportDateFrom" onchange="previewVendorExport()" style="flex:1">
+            <span style="color:var(--text3);font-size:13px;flex-shrink:0">～</span>
+            <input type="date" id="exportDateTo" onchange="previewVendorExport()" style="flex:1">
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm" onclick="setExportDatePreset('today')">今天</button>
+            <button type="button" class="btn btn-sm" onclick="setExportDatePreset('yesterday')">昨天</button>
+            <button type="button" class="btn btn-sm" onclick="setExportDatePreset('7d')">近7天</button>
+            <button type="button" class="btn btn-sm" onclick="setExportDatePreset('30d')">近30天</button>
+            <button type="button" class="btn btn-sm" onclick="setExportDatePreset('all')">全部</button>
+          </div>
         </div>
         <div class="form-row" style="margin-bottom:0">
           <label>訂單狀態篩選</label>
@@ -5785,7 +5796,33 @@ function updateExportPlatLabelStyle(p) {
   lbl.style.background  = cb.checked ? 'var(--accent-light)' : 'var(--surface2)';
 }
 
-function getExportFilteredOrders(dateStr) {
+function setExportDatePreset(preset) {
+  const today = new Date();
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const todayStr = fmt(today);
+  const fromEl = document.getElementById('exportDateFrom');
+  const toEl   = document.getElementById('exportDateTo');
+  if (!fromEl || !toEl) return;
+  if (preset === 'today') {
+    fromEl.value = todayStr; toEl.value = todayStr;
+  } else if (preset === 'yesterday') {
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    fromEl.value = fmt(y); toEl.value = fmt(y);
+  } else if (preset === '7d') {
+    const d = new Date(today); d.setDate(d.getDate() - 6);
+    fromEl.value = fmt(d); toEl.value = todayStr;
+  } else if (preset === '30d') {
+    const d = new Date(today); d.setDate(d.getDate() - 29);
+    fromEl.value = fmt(d); toEl.value = todayStr;
+  } else if (preset === 'all') {
+    fromEl.value = ''; toEl.value = '';
+  }
+  previewVendorExport();
+}
+
+function getExportFilteredOrders() {
+  const dateFrom     = document.getElementById('exportDateFrom')?.value || '';
+  const dateTo       = document.getElementById('exportDateTo')?.value   || '';
   const statusFilter = document.getElementById('exportStatusFilter')?.value || '';
   const selectedPlats = [...document.querySelectorAll('.export-plat-cb:checked')].map(cb => cb.value);
   const vendorId     = document.getElementById('vendorExportSelect')?.value  || '';
@@ -5796,9 +5833,10 @@ function getExportFilteredOrders(dateStr) {
 
   return orders.filter(o => {
     if (o.is_merged_secondary) return false;
-    if (dateStr) {
+    if (dateFrom || dateTo) {
       const oDate = (o.order_date || o.created_at || '').slice(0, 10);
-      if (oDate !== dateStr) return false;
+      if (dateFrom && oDate < dateFrom) return false;
+      if (dateTo   && oDate > dateTo)   return false;
     }
     if (statusFilter && o.status !== statusFilter) return false;
     if (selectedPlats.length > 0 && !selectedPlats.includes(o.platform)) return false;
@@ -5815,12 +5853,11 @@ function getExportFilteredOrders(dateStr) {
 }
 
 function previewVendorExport() {
-  const dateStr  = document.getElementById('exportDatePicker')?.value || '';
+  const dateFrom = document.getElementById('exportDateFrom')?.value || '';
+  const dateTo   = document.getElementById('exportDateTo')?.value   || '';
   const vendorId = document.getElementById('vendorExportSelect')?.value || '';
 
-  if (!dateStr) { document.getElementById('vendorExportPreview').innerHTML = ''; return; }
-
-  const allFiltered = getExportFilteredOrders(dateStr);
+  const allFiltered = getExportFilteredOrders();
 
   let html = '';
 
@@ -5853,11 +5890,11 @@ function previewRow(name, count) {
 }
 
 function doVendorExport() {
-  const dateStr  = document.getElementById('exportDatePicker')?.value;
+  const dateFrom = document.getElementById('exportDateFrom')?.value;
+  const dateTo   = document.getElementById('exportDateTo')?.value;
   const vendorId = document.getElementById('vendorExportSelect')?.value;
-  if (!dateStr) { alert('請選擇日期'); return; }
 
-  const allFiltered = getExportFilteredOrders(dateStr);
+  const allFiltered = getExportFilteredOrders();
 
   if (_exportType === 'vendor') {
     if (!vendorId) { alert('請選擇廠商'); return; }
