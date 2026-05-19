@@ -1846,11 +1846,10 @@
 
       <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-          <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">🛍 出貨商品對應</div>
-          <button type="button" class="btn btn-sm" onclick="noAddProductRow()">＋ 新增商品</button>
+          <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">🛍 商品資訊</div>
+          <button type="button" class="btn btn-sm" onclick="noAddItemGroup()">＋ 新增商品</button>
         </div>
-        <div id="noProductRows"></div>
-        <div id="noProductPreview" style="margin-top:6px"></div>
+        <div id="noItemGroups"></div>
       </div>
 
       <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
@@ -4807,28 +4806,22 @@ function openEditFromDrawer() {
 
 
 // ==================== NEW ORDER (MANUAL) ====================
-let _noProductCounter = 0;
+let _noItemGroupCounter = 0;
+let _noLinkedCounter = 0;
 
 function openNewOrderModal() {
   const sel = document.getElementById('noPlat');
   sel.innerHTML = '<option value="">— 選擇平台 —</option>' +
     Object.keys(PLATFORMS).map(k => `<option value="${k}">${PLATFORMS[k].label}</option>`).join('');
 
-  document.getElementById('noOrderId').value      = '';
-  document.getElementById('noOrderDate').value    = new Date().toISOString().slice(0, 10);
-  document.getElementById('noBuyerName').value    = '';
-  document.getElementById('noBuyerPhone').value   = '';
-  document.getElementById('noAddress').value      = '';
-  document.getElementById('noEmail').value        = '';
-  document.getElementById('noShipping').value     = '';
-  document.getElementById('noAmount').value       = '';
-  document.getElementById('noCustomerNote').value = '';
-  document.getElementById('noVendorNote').value   = '';
-  document.getElementById('noStatus').value       = 'pending';
-  document.getElementById('noProductRows').innerHTML    = '';
-  document.getElementById('noProductPreview').innerHTML = '';
-  _noProductCounter = 0;
-  noAddProductRow(); // start with one empty row
+  ['noOrderId','noBuyerName','noBuyerPhone','noAddress','noEmail','noShipping','noAmount','noCustomerNote','noVendorNote']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('noOrderDate').value  = new Date().toISOString().slice(0, 10);
+  document.getElementById('noStatus').value     = 'pending';
+  document.getElementById('noItemGroups').innerHTML = '';
+  _noItemGroupCounter = 0;
+  _noLinkedCounter = 0;
+  noAddItemGroup();
 
   document.getElementById('newOrderModal').classList.add('show');
   setTimeout(() => document.getElementById('noOrderId').focus(), 100);
@@ -4837,57 +4830,70 @@ function openNewOrderModal() {
 function noUpdateOrderId() {
   const plat = document.getElementById('noPlat').value;
   const field = document.getElementById('noOrderId');
-  if (!field.value && plat) {
+  if (!field.value && plat)
     field.placeholder = `${PLATFORMS[plat]?.label || plat}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`;
-  }
 }
 
-function noAddProductRow(preProductId, preQty) {
-  const uid = `no_${_noProductCounter++}`;
+function noAddItemGroup() {
+  const gi = _noItemGroupCounter++;
+  const groupId   = `noGroup_${gi}`;
+  const linkedId  = `noLinked_${gi}`;
+
+  const el = document.createElement('div');
+  el.id = groupId;
+  el.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden';
+  el.innerHTML = `
+    <!-- Platform item name + spec + qty -->
+    <div style="background:var(--surface2);padding:8px 12px;display:flex;align-items:flex-start;gap:8px">
+      <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 80px;gap:6px">
+        <div>
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">平台商品名稱</label>
+          <input type="text" id="noPlatName_${gi}" placeholder="平台顯示的商品名稱" style="width:100%;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">規格</label>
+          <input type="text" id="noPlatSpec_${gi}" placeholder="規格（選填）" style="width:100%;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">訂購數量</label>
+          <input type="number" id="noPlatQty_${gi}" value="1" min="1" style="width:100%;font-size:13px">
+        </div>
+      </div>
+      <button onmousedown="event.preventDefault();document.getElementById('${groupId}').remove()"
+        style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text3);padding:0 2px;line-height:1;margin-top:16px;flex-shrink:0">×</button>
+    </div>
+    <!-- Linked product rows -->
+    <div style="padding:8px 12px">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">↳ 出貨對應商品</div>
+      <div id="${linkedId}"></div>
+      <button type="button" class="btn btn-sm" onclick="noAddLinkedRow('${linkedId}')" style="font-size:11px;padding:2px 8px;margin-top:4px">＋ 新增對應</button>
+    </div>`;
+
+  document.getElementById('noItemGroups').appendChild(el);
+  noAddLinkedRow(linkedId); // start with one linked row
+}
+
+function noAddLinkedRow(containerId) {
+  const uid = `noL_${_noLinkedCounter++}`;
   const ss = new SearchableSelect(uid, SearchableSelect.fromProducts(products, vendors), {
     placeholder: '搜尋商品名稱、料號、簡稱…',
-    onchange: () => noRefreshPreview(),
+    onchange: () => {},
   });
 
   const row = document.createElement('div');
-  row.id = `noRow_${uid}`;
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 90px 32px;gap:6px;align-items:start;margin-bottom:8px';
+  row.id = `noLRow_${uid}`;
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 90px 32px;gap:6px;align-items:start;margin-bottom:6px';
   row.innerHTML = `
     ${ss.html()}
     <div style="display:flex;align-items:center;gap:4px;padding-top:1px">
-      <label style="font-size:11px;color:var(--text3);white-space:nowrap">數量</label>
-      <input type="number" id="noQty_${uid}" value="${preQty||'1'}" min="1"
-        style="width:52px;font-size:13px" oninput="noRefreshPreview()">
+      <label style="font-size:11px;color:var(--text3);white-space:nowrap">出貨量</label>
+      <input type="number" id="noLQty_${uid}" value="1" min="1" style="width:52px;font-size:13px">
     </div>
-    <button onmousedown="event.preventDefault();document.getElementById('noRow_${uid}').remove();noRefreshPreview()"
+    <button onmousedown="event.preventDefault();document.getElementById('noLRow_${uid}').remove()"
       style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:15px;padding:3px 7px;color:var(--text3);line-height:1;margin-top:1px">×</button>`;
 
-  document.getElementById('noProductRows').appendChild(row);
+  document.getElementById(containerId).appendChild(row);
   ss.mount();
-  if (preProductId) ss.setValue(preProductId);
-  noRefreshPreview();
-}
-
-function noRefreshPreview() {
-  const rows = document.querySelectorAll('[id^="noRow_"]');
-  let html = '';
-  rows.forEach(row => {
-    const uid = row.id.replace('noRow_', '');
-    const ss  = SearchableSelect.instances[uid];
-    const pid = ss?.value || '';
-    const qty = document.getElementById(`noQty_${uid}`)?.value || '1';
-    if (!pid) return;
-    const p = products.find(x => x.id === pid);
-    if (!p) return;
-    const v = vendors.find(vd => vd.id === p.vendor_id);
-    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surface);border-radius:var(--radius-sm);margin-top:4px;font-size:12px">
-      <span style="font-weight:600;flex:1">${p.name}</span>
-      ${p.short_name ? `<span style="background:var(--accent-light);color:var(--accent);padding:1px 7px;border-radius:10px;font-weight:700">${p.short_name}</span>` : ''}
-      ${v ? `<span style="color:var(--text3)">${v.name}</span>` : ''}
-      <span style="background:var(--info-light);color:var(--info);padding:1px 7px;border-radius:10px;font-weight:600">${qty} 件</span>
-    </div>`;
-  });
-  document.getElementById('noProductPreview').innerHTML = html;
 }
 
 async function saveNewOrder() {
@@ -4900,21 +4906,29 @@ async function saveNewOrder() {
     if (!confirm(`平台「${PLATFORMS[plat]?.label}」已有相同訂單編號「${orderId}」，確定仍要新增？`)) return;
   }
 
-  // Collect linked products from SearchableSelect rows
-  const linkedProducts = [];
-  document.querySelectorAll('[id^="noRow_"]').forEach(row => {
-    const uid = row.id.replace('noRow_', '');
-    const ss  = SearchableSelect.instances[uid];
-    const pid = ss?.value || '';
-    const qty = document.getElementById(`noQty_${uid}`)?.value || '1';
-    if (pid) linkedProducts.push({ product_id: pid, qty });
+  // Collect all item groups
+  const itemGroups = [];
+  document.querySelectorAll('[id^="noGroup_"]').forEach(groupEl => {
+    const gi = groupEl.id.replace('noGroup_', '');
+    const platName = document.getElementById(`noPlatName_${gi}`)?.value.trim() || '';
+    const platSpec = document.getElementById(`noPlatSpec_${gi}`)?.value.trim() || '';
+    const platQty  = document.getElementById(`noPlatQty_${gi}`)?.value || '1';
+
+    const linkedProducts = [];
+    groupEl.querySelectorAll('[id^="noLRow_"]').forEach(row => {
+      const uid = row.id.replace('noLRow_', '');
+      const ss  = SearchableSelect.instances[uid];
+      const pid = ss?.value || '';
+      const qty = document.getElementById(`noLQty_${uid}`)?.value || '1';
+      if (pid) linkedProducts.push({ product_id: pid, qty });
+    });
+
+    itemGroups.push({ product_name: platName, product_spec: platSpec, platform_qty: platQty, product_qty: platQty, linked_products: linkedProducts, linked_product_id: linkedProducts.length === 1 ? linkedProducts[0].product_id : '' });
   });
 
   const amount = parseFloat(document.getElementById('noAmount').value) || 0;
   const now    = new Date().toISOString();
-
-  // Build product name display from linked products
-  const firstProduct = linkedProducts.length > 0 ? products.find(p => p.id === linkedProducts[0].product_id) : null;
+  const first  = itemGroups[0] || {};
 
   const newOrder = {
     id:               'order_' + Date.now(),
@@ -4927,33 +4941,25 @@ async function saveNewOrder() {
     buyer_email:      document.getElementById('noEmail').value.trim(),
     shipping_address: document.getElementById('noAddress').value.trim(),
     shipping_method:  document.getElementById('noShipping').value.trim(),
-    amount:           amount,
+    amount,
     customer_note:    document.getElementById('noCustomerNote').value.trim(),
     vendor_note:      document.getElementById('noVendorNote').value.trim(),
-    product_name:     firstProduct?.name || '',
-    product_spec:     '',
-    product_qty:      linkedProducts[0]?.qty || '',
-    platform_qty:     linkedProducts[0]?.qty || '',
-    linked_products:  linkedProducts.length > 1 ? linkedProducts : [],
-    linked_product_id: linkedProducts.length === 1 ? linkedProducts[0].product_id : '',
-    items:            [],
-    is_merged_primary: false,
-    is_merged_secondary: false,
-    merged_from:      [],
-    merged_into:      '',
-    holding_area_id:  '',
-    tracking_number:  '',
-    note:             '',
-    created_at:       now,
+    product_name:     first.product_name || '',
+    product_spec:     first.product_spec || '',
+    product_qty:      first.product_qty  || '',
+    platform_qty:     first.platform_qty || '',
+    linked_product_id: itemGroups.length === 1 && first.linked_products?.length === 1 ? first.linked_product_id : '',
+    linked_products:  itemGroups.length === 1 && first.linked_products?.length > 1 ? first.linked_products : [],
+    items:            itemGroups.length > 1 ? itemGroups : [],
+    is_merged_primary: false, is_merged_secondary: false,
+    merged_from: [], merged_into: '', holding_area_id: '',
+    tracking_number: '', note: '', created_at: now,
   };
 
   orders.unshift(newOrder);
   await saveOrder_DB(newOrder);
   closeModal('newOrderModal');
-  renderOrders();
-  renderOrderPlatTabs();
-  renderDashboard();
-  updatePendingBadge();
+  renderOrders(); renderOrderPlatTabs(); renderDashboard(); updatePendingBadge();
   alert(`✅ 訂單「${orderId}」已新增`);
 }
 
