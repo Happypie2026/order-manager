@@ -1846,24 +1846,17 @@
 
       <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-          <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">🛍 商品資訊</div>
-          <button type="button" class="btn btn-sm" onclick="noAddItem()">＋ 新增商品</button>
+          <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">🛍 出貨商品對應</div>
+          <button type="button" class="btn btn-sm" onclick="noAddProductRow()">＋ 新增商品</button>
         </div>
-        <div id="noItemList"></div>
+        <div id="noProductRows"></div>
+        <div id="noProductPreview" style="margin-top:6px"></div>
       </div>
 
       <div style="border-top:1px solid var(--border);margin:0.75rem 0;padding-top:0.75rem">
-        <div class="form-grid">
-          <div class="form-row">
-            <label>訂單金額</label>
-            <input type="number" id="noAmount" placeholder="0" oninput="noUpdateAmount()">
-          </div>
-          <div class="form-row">
-            <label style="display:flex;align-items:center;gap:6px">
-              <input type="checkbox" id="noAutoCalc" checked onchange="noUpdateAmount()">
-              自動加總商品金額
-            </label>
-          </div>
+        <div class="form-row">
+          <label>訂單金額</label>
+          <input type="number" id="noAmount" placeholder="0">
         </div>
         <div class="form-row">
           <label>客戶備註</label>
@@ -4814,37 +4807,34 @@ function openEditFromDrawer() {
 
 
 // ==================== NEW ORDER (MANUAL) ====================
-let _noItemCount = 0;
+let _noProductCounter = 0;
 
 function openNewOrderModal() {
-  // Populate platform select
   const sel = document.getElementById('noPlat');
   sel.innerHTML = '<option value="">— 選擇平台 —</option>' +
     Object.keys(PLATFORMS).map(k => `<option value="${k}">${PLATFORMS[k].label}</option>`).join('');
 
-  // Reset fields
-  document.getElementById('noOrderId').value    = '';
-  document.getElementById('noOrderDate').value  = new Date().toISOString().slice(0, 10);
-  document.getElementById('noBuyerName').value  = '';
-  document.getElementById('noBuyerPhone').value = '';
-  document.getElementById('noAddress').value    = '';
-  document.getElementById('noEmail').value      = '';
-  document.getElementById('noShipping').value   = '';
-  document.getElementById('noAmount').value     = '';
+  document.getElementById('noOrderId').value      = '';
+  document.getElementById('noOrderDate').value    = new Date().toISOString().slice(0, 10);
+  document.getElementById('noBuyerName').value    = '';
+  document.getElementById('noBuyerPhone').value   = '';
+  document.getElementById('noAddress').value      = '';
+  document.getElementById('noEmail').value        = '';
+  document.getElementById('noShipping').value     = '';
+  document.getElementById('noAmount').value       = '';
   document.getElementById('noCustomerNote').value = '';
   document.getElementById('noVendorNote').value   = '';
-  document.getElementById('noStatus').value     = 'pending';
-  document.getElementById('noAutoCalc').checked = true;
-  document.getElementById('noItemList').innerHTML = '';
-  _noItemCount = 0;
-  noAddItem(); // start with one empty item
+  document.getElementById('noStatus').value       = 'pending';
+  document.getElementById('noProductRows').innerHTML    = '';
+  document.getElementById('noProductPreview').innerHTML = '';
+  _noProductCounter = 0;
+  noAddProductRow(); // start with one empty row
 
   document.getElementById('newOrderModal').classList.add('show');
   setTimeout(() => document.getElementById('noOrderId').focus(), 100);
 }
 
 function noUpdateOrderId() {
-  // Auto-suggest order id prefix based on platform
   const plat = document.getElementById('noPlat').value;
   const field = document.getElementById('noOrderId');
   if (!field.value && plat) {
@@ -4852,52 +4842,52 @@ function noUpdateOrderId() {
   }
 }
 
-function noAddItem() {
-  const idx = _noItemCount++;
-  const el = document.createElement('div');
-  el.id = `noItem_${idx}`;
-  el.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;position:relative';
-  el.innerHTML = `
-    <button type="button" onclick="noRemoveItem(${idx})"
-      style="position:absolute;top:6px;right:8px;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text3);padding:0;line-height:1">×</button>
-    <div class="form-grid" style="margin-bottom:6px">
-      <div class="form-row" style="margin-bottom:0">
-        <label style="font-size:11.5px">商品名稱</label>
-        <input type="text" id="noItemName_${idx}" placeholder="商品名稱" oninput="noUpdateAmount()">
-      </div>
-      <div class="form-row" style="margin-bottom:0">
-        <label style="font-size:11.5px">規格</label>
-        <input type="text" id="noItemSpec_${idx}" placeholder="規格（選填）">
-      </div>
+function noAddProductRow(preProductId, preQty) {
+  const uid = `no_${_noProductCounter++}`;
+  const ss = new SearchableSelect(uid, SearchableSelect.fromProducts(products, vendors), {
+    placeholder: '搜尋商品名稱、料號、簡稱…',
+    onchange: () => noRefreshPreview(),
+  });
+
+  const row = document.createElement('div');
+  row.id = `noRow_${uid}`;
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 90px 32px;gap:6px;align-items:start;margin-bottom:8px';
+  row.innerHTML = `
+    ${ss.html()}
+    <div style="display:flex;align-items:center;gap:4px;padding-top:1px">
+      <label style="font-size:11px;color:var(--text3);white-space:nowrap">數量</label>
+      <input type="number" id="noQty_${uid}" value="${preQty||'1'}" min="1"
+        style="width:52px;font-size:13px" oninput="noRefreshPreview()">
     </div>
-    <div class="form-grid">
-      <div class="form-row" style="margin-bottom:0">
-        <label style="font-size:11.5px">數量</label>
-        <input type="number" id="noItemQty_${idx}" placeholder="1" min="1" value="1" oninput="noUpdateAmount()">
-      </div>
-      <div class="form-row" style="margin-bottom:0">
-        <label style="font-size:11.5px">單價</label>
-        <input type="number" id="noItemPrice_${idx}" placeholder="0" min="0" oninput="noUpdateAmount()">
-      </div>
+    <button onmousedown="event.preventDefault();document.getElementById('noRow_${uid}').remove();noRefreshPreview()"
+      style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:15px;padding:3px 7px;color:var(--text3);line-height:1;margin-top:1px">×</button>`;
+
+  document.getElementById('noProductRows').appendChild(row);
+  ss.mount();
+  if (preProductId) ss.setValue(preProductId);
+  noRefreshPreview();
+}
+
+function noRefreshPreview() {
+  const rows = document.querySelectorAll('[id^="noRow_"]');
+  let html = '';
+  rows.forEach(row => {
+    const uid = row.id.replace('noRow_', '');
+    const ss  = SearchableSelect.instances[uid];
+    const pid = ss?.value || '';
+    const qty = document.getElementById(`noQty_${uid}`)?.value || '1';
+    if (!pid) return;
+    const p = products.find(x => x.id === pid);
+    if (!p) return;
+    const v = vendors.find(vd => vd.id === p.vendor_id);
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surface);border-radius:var(--radius-sm);margin-top:4px;font-size:12px">
+      <span style="font-weight:600;flex:1">${p.name}</span>
+      ${p.short_name ? `<span style="background:var(--accent-light);color:var(--accent);padding:1px 7px;border-radius:10px;font-weight:700">${p.short_name}</span>` : ''}
+      ${v ? `<span style="color:var(--text3)">${v.name}</span>` : ''}
+      <span style="background:var(--info-light);color:var(--info);padding:1px 7px;border-radius:10px;font-weight:600">${qty} 件</span>
     </div>`;
-  document.getElementById('noItemList').appendChild(el);
-}
-
-function noRemoveItem(idx) {
-  const el = document.getElementById(`noItem_${idx}`);
-  if (el) el.remove();
-  noUpdateAmount();
-}
-
-function noUpdateAmount() {
-  if (!document.getElementById('noAutoCalc')?.checked) return;
-  let total = 0;
-  for (let i = 0; i < _noItemCount; i++) {
-    const qty   = parseFloat(document.getElementById(`noItemQty_${i}`)?.value)   || 0;
-    const price = parseFloat(document.getElementById(`noItemPrice_${i}`)?.value) || 0;
-    total += qty * price;
-  }
-  if (total > 0) document.getElementById('noAmount').value = total;
+  });
+  document.getElementById('noProductPreview').innerHTML = html;
 }
 
 async function saveNewOrder() {
@@ -4906,26 +4896,25 @@ async function saveNewOrder() {
   if (!plat)    { alert('請選擇平台'); return; }
   if (!orderId) { alert('請填寫訂單編號'); return; }
 
-  // Check duplicate order_id
   if (orders.some(o => o.order_id === orderId && o.platform === plat)) {
     if (!confirm(`平台「${PLATFORMS[plat]?.label}」已有相同訂單編號「${orderId}」，確定仍要新增？`)) return;
   }
 
-  // Collect items
-  const items = [];
-  for (let i = 0; i < _noItemCount; i++) {
-    const nameEl = document.getElementById(`noItemName_${i}`);
-    if (!nameEl) continue; // removed
-    const name  = nameEl.value.trim();
-    const spec  = document.getElementById(`noItemSpec_${i}`)?.value.trim()  || '';
-    const qty   = document.getElementById(`noItemQty_${i}`)?.value          || '1';
-    const price = document.getElementById(`noItemPrice_${i}`)?.value        || '0';
-    if (!name) continue; // skip empty rows
-    items.push({ product_name: name, product_spec: spec, product_qty: qty, platform_qty: qty, unit_price: price, linked_products: [], linked_product_id: '' });
-  }
+  // Collect linked products from SearchableSelect rows
+  const linkedProducts = [];
+  document.querySelectorAll('[id^="noRow_"]').forEach(row => {
+    const uid = row.id.replace('noRow_', '');
+    const ss  = SearchableSelect.instances[uid];
+    const pid = ss?.value || '';
+    const qty = document.getElementById(`noQty_${uid}`)?.value || '1';
+    if (pid) linkedProducts.push({ product_id: pid, qty });
+  });
 
   const amount = parseFloat(document.getElementById('noAmount').value) || 0;
   const now    = new Date().toISOString();
+
+  // Build product name display from linked products
+  const firstProduct = linkedProducts.length > 0 ? products.find(p => p.id === linkedProducts[0].product_id) : null;
 
   const newOrder = {
     id:               'order_' + Date.now(),
@@ -4941,13 +4930,13 @@ async function saveNewOrder() {
     amount:           amount,
     customer_note:    document.getElementById('noCustomerNote').value.trim(),
     vendor_note:      document.getElementById('noVendorNote').value.trim(),
-    product_name:     items[0]?.product_name || '',
-    product_spec:     items[0]?.product_spec || '',
-    product_qty:      items[0]?.product_qty  || '',
-    platform_qty:     items[0]?.platform_qty || '',
-    items:            items.length > 1 ? items : [],
-    linked_products:  [],
-    linked_product_id:'',
+    product_name:     firstProduct?.name || '',
+    product_spec:     '',
+    product_qty:      linkedProducts[0]?.qty || '',
+    platform_qty:     linkedProducts[0]?.qty || '',
+    linked_products:  linkedProducts.length > 1 ? linkedProducts : [],
+    linked_product_id: linkedProducts.length === 1 ? linkedProducts[0].product_id : '',
+    items:            [],
     is_merged_primary: false,
     is_merged_secondary: false,
     merged_from:      [],
