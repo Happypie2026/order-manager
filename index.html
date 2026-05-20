@@ -3774,6 +3774,7 @@ function renderOrders() {
           <td>
             <button class="btn btn-sm" onclick="openDrawer('${o.id}')" style="margin-right:3px">詳情</button>
             <button class="btn btn-sm" onclick="openEditModal('${o.id}')" style="margin-right:3px">編輯</button>
+            <button class="btn btn-sm" onclick="openQuickHoldMenu('${o.id}',this)" style="margin-right:3px;padding:3px 7px" title="移至暫存區">📌</button>
             <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">刪除</button>
           </td>
         </tr>`;
@@ -4000,6 +4001,79 @@ async function deleteHoldingArea(id) {
   await saveOrders();
   if (orderFilter.holdingAreaId===id) orderFilter.holdingAreaId='';
   renderHoldingAreas(); renderOrders();
+}
+
+function openQuickHoldMenu(orderId, btn) {
+  // Remove any existing quick-hold menu
+  document.querySelectorAll('.quick-hold-menu').forEach(el => el.remove());
+
+  if (!holdingAreas.length) {
+    alert('尚無暫存區，請先在「訂單暫存區」新增');
+    return;
+  }
+
+  const menu = document.createElement('div');
+  menu.className = 'quick-hold-menu';
+  menu.style.cssText = `
+    position:fixed;z-index:9999;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);
+    min-width:180px;padding:4px 0;font-size:13px;
+  `;
+
+  // Get current holding area of this order
+  const o = orders.find(x => x.id === orderId);
+  const currentHaId = o?.holding_area_id || '';
+
+  menu.innerHTML = `
+    <div style="padding:6px 12px;font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);margin-bottom:4px">移至暫存區</div>
+    ${holdingAreas.map(ha => `
+      <div onclick="quickMoveToHolding('${orderId}','${ha.id}')"
+        style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;
+               background:${currentHaId===ha.id?'var(--accent-light)':''}"
+        onmouseover="this.style.background='var(--surface2)'"
+        onmouseout="this.style.background='${currentHaId===ha.id?'var(--accent-light)':''}'">
+        <span>${ha.locked?'🔒 ':'📌 '}${ha.name}</span>
+        ${currentHaId===ha.id?'<span style="color:var(--accent);font-size:11px;font-weight:700">目前</span>':''}
+      </div>`).join('')}
+    ${currentHaId ? `
+      <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">
+        <div onclick="quickMoveToHolding('${orderId}','')"
+          style="padding:8px 14px;cursor:pointer;color:var(--text2)"
+          onmouseover="this.style.background='var(--surface2)'"
+          onmouseout="this.style.background=''">
+          ✕ 移出暫存區
+        </div>
+      </div>` : ''}
+  `;
+
+  // Position below the button
+  const rect = btn.getBoundingClientRect();
+  menu.style.top  = (rect.bottom + 4 + window.scrollY) + 'px';
+  menu.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
+
+  document.body.appendChild(menu);
+
+  // Close on outside click
+  const close = (e) => {
+    if (!menu.contains(e.target) && e.target !== btn) {
+      menu.remove();
+      document.removeEventListener('click', close, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', close, true), 10);
+}
+
+async function quickMoveToHolding(orderId, haId) {
+  document.querySelectorAll('.quick-hold-menu').forEach(el => el.remove());
+  const idx = orders.findIndex(o => o.id === orderId);
+  if (idx < 0) return;
+  orders[idx] = { ...orders[idx], holding_area_id: haId };
+  await saveOrder_DB(orders[idx]);
+  localStorage.setItem('orders', JSON.stringify(orders));
+  renderHoldingAreas();
+  renderOrders();
+  renderOrderPlatTabs();
 }
 
 function openBatchHoldModal() {
