@@ -582,7 +582,7 @@
       <!-- Stock alert banner removed -->
       <div class="stats-row" id="dashStats"></div>
       <div class="card card-pad mb-3">
-        <div class="card-title">待處理事項</div>
+        <div class="card-title">📦 待進貨項目</div>
         <div id="todoList"></div>
       </div>
       <div class="card card-pad mb-3">
@@ -814,6 +814,34 @@
         </div>
         <button class="btn" onclick="exportReport()">📥 匯出報表</button>
       </div>
+
+      <!-- Date filter -->
+      <div class="card card-pad mb-3" style="padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:13px;color:var(--text2);white-space:nowrap">年份</label>
+            <select id="reportYear" onchange="renderReport()" style="font-size:13px;padding:4px 8px"></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:13px;color:var(--text2);white-space:nowrap">月份</label>
+            <select id="reportMonth" onchange="renderReport()" style="font-size:13px;padding:4px 8px">
+              <option value="">全年</option>
+              <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+              <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+              <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+              <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="setReportPreset('thisMonth')">本月</button>
+            <button class="btn btn-sm" onclick="setReportPreset('lastMonth')">上月</button>
+            <button class="btn btn-sm" onclick="setReportPreset('thisYear')">今年</button>
+            <button class="btn btn-sm" onclick="setReportPreset('all')">全部</button>
+          </div>
+          <div id="reportDateLabel" style="font-size:12px;color:var(--text3);margin-left:auto"></div>
+        </div>
+      </div>
+
       <div class="stats-row" id="reportStats"></div>
       <div class="grid-2 mb-3">
         <div class="card card-pad">
@@ -2918,7 +2946,18 @@ function showPage(id) {
   else setMobileNav(id);
   closeMobileOrdersSheet();
   if (id === 'orders') { populateOrderVendorFilter(); renderHoldingAreas(); renderOrderPlatTabs(); renderOrders(); }
-  if (id === 'report') renderReport();
+  if (id === 'report') {
+    // Default to current month on first visit
+    const yearSel = document.getElementById('reportYear');
+    const now = new Date();
+    if (yearSel && !yearSel.options.length) {
+      yearSel.innerHTML = `<option value="${now.getFullYear()}">${now.getFullYear()}年</option>`;
+    }
+    if (yearSel && !yearSel.value) yearSel.value = String(now.getFullYear());
+    const monthSel = document.getElementById('reportMonth');
+    if (monthSel && !monthSel.value) monthSel.value = String(now.getMonth() + 1);
+    renderReport();
+  }
   if (id === 'mapping') renderMappingCards();
   if (id === 'vendors') renderVendors();
   if (id === 'products') { populateProductVendorFilter(); renderProducts(); }
@@ -2932,22 +2971,28 @@ function showPage(id) {
 
 // ==================== DASHBOARD ====================
 function renderDashboard() {
-  const valid = orders.filter(o => o.status !== 'cancelled');
-  const revenue = valid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
-  const pending = orders.filter(o => o.status === 'pending').length;
-  const shipped = orders.filter(o => o.status === 'shipped').length;
+  // Current month filter
+  const now = new Date();
+  const thisYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthOrders = orders.filter(o => {
+    const d = (o.order_date || o.created_at || '').slice(0, 7);
+    return d === thisYM;
+  });
+  const monthValid   = monthOrders.filter(o => o.status !== 'cancelled');
+  const monthRevenue = monthValid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
+  const pending      = orders.filter(o => o.status === 'pending').length;
+  const monthLabel   = `${now.getFullYear()}年${now.getMonth()+1}月`;
 
   document.getElementById('dashStats').innerHTML = [
-    { label: '總訂單數', val: orders.length + ' 筆', sub: '全平台累計', accent: false },
-    { label: '總營收', val: '$' + Math.round(revenue).toLocaleString(), sub: '未含取消', accent: true },
-    { label: '待確認', val: pending + ' 筆', sub: '需要處理', accent: false },
-    { label: '已出貨', val: shipped + ' 筆', sub: '等待送達', accent: false },
+    { label: '當月訂單數', val: monthOrders.length + ' 筆', sub: monthLabel, accent: false },
+    { label: '當月營收', val: '$' + Math.round(monthRevenue).toLocaleString(), sub: '未含取消', accent: true },
+    { label: '待確認訂單', val: pending + ' 筆', sub: '全平台待處理', accent: false },
   ].map(s => `<div class="stat-card${s.accent ? ' stat-accent' : ''}"><div class="stat-label">${s.label}</div><div class="stat-num">${s.val}</div><div class="stat-sub">${s.sub}</div></div>`).join('');
 
-  // Platform chart
+  // Platform chart - current month only
   const platData = Object.keys(PLATFORMS).map(k => ({
     key: k, label: PLATFORMS[k].label,
-    count: orders.filter(o => o.platform === k).length,
+    count: monthOrders.filter(o => o.platform === k).length,
     color: PLATFORMS[k].color
   })).filter(p => p.count > 0).sort((a, b) => b.count - a.count);
   const maxCount = Math.max(1, ...platData.map(p => p.count));
@@ -6580,8 +6625,64 @@ function exportVendorExcelRows(vendorName, rows, dateStr) {
 }
 
 // ==================== REPORT ====================
+function initReportYearSelector() {
+  const sel = document.getElementById('reportYear');
+  if (!sel || sel.options.length > 1) return;
+  const years = [...new Set(orders.map(o => (o.order_date || o.created_at || '').slice(0,4)).filter(Boolean))];
+  const now = new Date();
+  const thisYear = String(now.getFullYear());
+  const allYears = [...new Set([...years, thisYear])].sort().reverse();
+  sel.innerHTML = '<option value="">全部年份</option>' + allYears.map(y => `<option value="${y}">${y}年</option>`).join('');
+  sel.value = thisYear;
+}
+
+function setReportPreset(preset) {
+  const now = new Date();
+  const yearSel  = document.getElementById('reportYear');
+  const monthSel = document.getElementById('reportMonth');
+  if (!yearSel || !monthSel) return;
+  if (preset === 'thisMonth') {
+    yearSel.value  = String(now.getFullYear());
+    monthSel.value = String(now.getMonth() + 1);
+  } else if (preset === 'lastMonth') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    yearSel.value  = String(d.getFullYear());
+    monthSel.value = String(d.getMonth() + 1);
+  } else if (preset === 'thisYear') {
+    yearSel.value  = String(now.getFullYear());
+    monthSel.value = '';
+  } else if (preset === 'all') {
+    yearSel.value  = '';
+    monthSel.value = '';
+  }
+  renderReport();
+}
+
 function renderReport() {
-  const valid = orders.filter(o => o.status !== 'cancelled');
+  initReportYearSelector();
+
+  const selYear  = document.getElementById('reportYear')?.value  || '';
+  const selMonth = document.getElementById('reportMonth')?.value || '';
+
+  // Filter orders by selected year/month
+  const filtered = orders.filter(o => {
+    const d = (o.order_date || o.created_at || '').slice(0, 10);
+    if (!d) return false;
+    if (selYear  && !d.startsWith(selYear))  return false;
+    if (selMonth && d.slice(5, 7) !== String(selMonth).padStart(2, '0')) return false;
+    return true;
+  });
+
+  // Update label
+  const labelEl = document.getElementById('reportDateLabel');
+  if (labelEl) {
+    if (!selYear && !selMonth) labelEl.textContent = '顯示全部時間';
+    else if (selYear && selMonth) labelEl.textContent = `${selYear}年${selMonth}月`;
+    else if (selYear) labelEl.textContent = `${selYear}年`;
+    else labelEl.textContent = `每年${selMonth}月`;
+  }
+
+  const valid = filtered.filter(o => o.status !== 'cancelled');
   const revenue = valid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
   const avgOrder = valid.length ? revenue / valid.length : 0;
 
@@ -6589,11 +6690,11 @@ function renderReport() {
     { label: '有效訂單', val: valid.length + ' 筆' },
     { label: '總營收', val: '$' + Math.round(revenue).toLocaleString() },
     { label: '平均客單價', val: '$' + Math.round(avgOrder).toLocaleString() },
-    { label: '取消率', val: orders.length ? Math.round(orders.filter(o=>o.status==='cancelled').length/orders.length*100) + '%' : '0%' },
+    { label: '取消率', val: filtered.length ? Math.round(filtered.filter(o=>o.status==='cancelled').length/filtered.length*100) + '%' : '0%' },
   ].map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-num">${s.val}</div></div>`).join('');
 
   const platStats = Object.keys(PLATFORMS).map(k => {
-    const platOrders = orders.filter(o => o.platform === k);
+    const platOrders = filtered.filter(o => o.platform === k);
     const platValid = platOrders.filter(o => o.status !== 'cancelled');
     const platRevenue = platValid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
     return { key: k, label: PLATFORMS[k].label, color: PLATFORMS[k].color, count: platOrders.length, revenue: platRevenue, valid: platValid.length };
@@ -6612,8 +6713,8 @@ function renderReport() {
 
   document.getElementById('reportBody').innerHTML = platStats.length
     ? platStats.map(p => {
-        const delivered = orders.filter(o => o.platform === p.key && o.status === 'delivered').length;
-        const cancelled = orders.filter(o => o.platform === p.key && o.status === 'cancelled').length;
+        const delivered = filtered.filter(o => o.platform === p.key && o.status === 'delivered').length;
+        const cancelled = filtered.filter(o => o.platform === p.key && o.status === 'cancelled').length;
         const avg = p.valid ? Math.round(p.revenue / p.valid) : 0;
         return `<tr><td>${platTag(p.key)}</td><td>${p.count}</td><td>$${Math.round(p.revenue).toLocaleString()}</td><td>$${avg.toLocaleString()}</td><td>${p.count ? Math.round(delivered/p.count*100) : 0}%</td><td>${p.count ? Math.round(cancelled/p.count*100) : 0}%</td></tr>`;
       }).join('')
@@ -6621,14 +6722,24 @@ function renderReport() {
 }
 
 function exportReport() {
+  const selYear  = document.getElementById('reportYear')?.value  || '';
+  const selMonth = document.getElementById('reportMonth')?.value || '';
+  const filtered = orders.filter(o => {
+    const d = (o.order_date || o.created_at || '').slice(0, 10);
+    if (!d) return false;
+    if (selYear  && !d.startsWith(selYear))  return false;
+    if (selMonth && d.slice(5, 7) !== String(selMonth).padStart(2, '0')) return false;
+    return true;
+  });
   const platStats = Object.keys(PLATFORMS).map(k => {
-    const platOrders = orders.filter(o => o.platform === k);
+    const platOrders = filtered.filter(o => o.platform === k);
     const platValid = platOrders.filter(o => o.status !== 'cancelled');
     const revenue = platValid.reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
     return [PLATFORMS[k].label, platOrders.length, Math.round(revenue), platValid.length ? Math.round(revenue/platValid.length) : 0];
-  });
+  }).filter(r => r[1] > 0);
+  const label = selYear && selMonth ? `${selYear}-${selMonth}` : selYear || 'all';
   const csv = [['平台', '訂單數', '總營收', '平均客單價'], ...platStats].map(r => r.join(',')).join('\n');
-  downloadFile('\uFEFF' + csv, `report_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+  downloadFile('\uFEFF' + csv, `report_${label}.csv`, 'text/csv');
 }
 
 // ==================== MAPPING CARDS ====================
