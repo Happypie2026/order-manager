@@ -586,6 +586,10 @@
         <div id="todoList"></div>
       </div>
       <div class="card card-pad mb-3">
+        <div class="card-title">⏳ 待辦事項</div>
+        <div id="todoTasks"></div>
+      </div>
+      <div class="card card-pad mb-3">
         <div class="card-title">各平台訂單數</div>
         <div class="bar-chart" id="platChart"></div>
       </div>
@@ -3038,11 +3042,17 @@ function renderDashboard() {
     </div>`);
   }
 
-  if (pending > 0) todos.push(`<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;display:flex;justify-content:space-between"><span>⏳ 有 <strong>${pending}</strong> 筆訂單待確認</span><button class="btn btn-sm" onclick="showPage('orders')">處理</button></div>`);
-  const shippedPending = orders.filter(o => o.status === 'processing').length;
-  if (shippedPending > 0) todos.push(`<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;display:flex;justify-content:space-between"><span>📦 有 <strong>${shippedPending}</strong> 筆訂單處理中</span><button class="btn btn-sm" onclick="showPage('orders')">更新</button></div>`);
-  if (!todos.length) todos.push(`<div style="padding:10px 0;font-size:13.5px;color:var(--text3)">🎉 目前沒有待處理事項</div>`);
+  // 待進貨：只放 upcoming arrival 項目
+  if (!todos.length) todos.push(`<div style="padding:10px 0;font-size:13.5px;color:var(--text3)">✅ 近14天無待進貨項目</div>`);
   document.getElementById('todoList').innerHTML = todos.join('');
+
+  // 待辦事項：訂單待確認、處理中
+  const tasks = [];
+  if (pending > 0) tasks.push(`<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;display:flex;justify-content:space-between"><span>⏳ 有 <strong>${pending}</strong> 筆訂單待確認</span><button class="btn btn-sm" onclick="showPage('orders')">處理</button></div>`);
+  const shippedPending = orders.filter(o => o.status === 'processing').length;
+  if (shippedPending > 0) tasks.push(`<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;display:flex;justify-content:space-between"><span>📦 有 <strong>${shippedPending}</strong> 筆訂單處理中</span><button class="btn btn-sm" onclick="showPage('orders')">更新</button></div>`);
+  if (!tasks.length) tasks.push(`<div style="padding:10px 0;font-size:13.5px;color:var(--text3)">🎉 目前沒有待辦事項</div>`);
+  document.getElementById('todoTasks').innerHTML = tasks.join('');
 
   // Recent orders
   const recent = [...orders].sort((a, b) => new Date(b.order_date||b.created_at||0) - new Date(a.order_date||a.created_at||0)).slice(0, 8);
