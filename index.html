@@ -793,6 +793,7 @@
                 <th>訂單編號</th>
                 <th>平台</th>
                 <th>買家</th>
+                <th id="thRemark" style="display:none">備註</th>
                 <th>商品品名</th>
                 <th>金額</th>
                 <th>狀態</th>
@@ -3767,6 +3768,9 @@ function renderOrders() {
           </td>
           <td data-label="平台">${platTag(o.platform)}</td>
           <td data-label="買家">${o.buyer_name||'-'}</td>
+          ${ha ? `<td data-label="備註" style="font-size:12px;color:var(--text2);max-width:120px">
+            ${o.vendor_note ? `<span title="${o.vendor_note}" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${o.vendor_note}</span>` : '<span style="color:var(--text3)">—</span>'}
+          </td>` : ''}
           <td data-label="商品" style="font-size:12px;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${productDisplay}</td>
           <td data-label="金額" style="font-weight:500">$${(o.amount||0).toLocaleString()}</td>
           <td data-label="狀態">${statusPill(o.status)}</td>
@@ -3784,6 +3788,9 @@ function renderOrders() {
   document.getElementById('ordersPageInfo').textContent = `共 ${total} 筆`;
   renderPageBtns('ordersPageBtns', pages, orderFilter.page, p => { orderFilter.page = p; renderOrders(); });
   updateBatchBar();
+  // Show 備註 column only when viewing a holding area
+  const thRemark = document.getElementById('thRemark');
+  if (thRemark) thRemark.style.display = (orderFilter.holdingAreaId && orderFilter.holdingAreaId !== '__none__' && orderFilter.holdingAreaId !== '__has_holding__') ? '' : 'none';
 }
 
 function renderPageBtns(containerId, pages, current, cb) {
