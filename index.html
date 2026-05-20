@@ -3691,6 +3691,7 @@ function renderOrders() {
   const sort   = document.getElementById('orderSort')?.value || 'date_desc';
   const vendId = document.getElementById('orderVendorFilter')?.value || '';
   const haId   = orderFilter.holdingAreaId;
+  const isHoldingView = !!(haId && haId !== '__none__' && haId !== '__has_holding__');
 
   let filtered = orders.filter(o => {
     // Hide merged-secondary orders — absorbed into the primary, visible via primary's detail
@@ -3768,7 +3769,7 @@ function renderOrders() {
           </td>
           <td data-label="平台">${platTag(o.platform)}</td>
           <td data-label="買家">${o.buyer_name||'-'}</td>
-          ${ha ? `<td data-label="備註" style="font-size:12px;color:var(--text2);max-width:120px">
+          ${isHoldingView ? `<td data-label="備註" style="font-size:12px;max-width:120px">
             ${o.vendor_note ? `<span title="${o.vendor_note}" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${o.vendor_note}</span>` : '<span style="color:var(--text3)">—</span>'}
           </td>` : ''}
           <td data-label="商品" style="font-size:12px;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${productDisplay}</td>
@@ -3790,7 +3791,7 @@ function renderOrders() {
   updateBatchBar();
   // Show 備註 column only when viewing a holding area
   const thRemark = document.getElementById('thRemark');
-  if (thRemark) thRemark.style.display = (orderFilter.holdingAreaId && orderFilter.holdingAreaId !== '__none__' && orderFilter.holdingAreaId !== '__has_holding__') ? '' : 'none';
+  if (thRemark) thRemark.style.display = isHoldingView ? '' : 'none';
 }
 
 function renderPageBtns(containerId, pages, current, cb) {
