@@ -1677,6 +1677,14 @@
         選取的訂單將合併成一筆出貨單。請選擇<strong>主訂單</strong>（保留買家姓名、電話、地址等資訊），其他訂單的商品將合併進來。
       </div>
 
+      <!-- Search & pick orders -->
+      <div id="mergePickSection" style="display:none;margin-bottom:1rem">
+        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">搜尋並勾選要合併的訂單</div>
+        <input type="text" id="mergeSearchInput" placeholder="搜尋訂單編號、買家姓名…" oninput="renderMergeSearchResults()" style="width:100%;margin-bottom:8px">
+        <div id="mergeSearchResults" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)"></div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">已勾選：<span id="mergePickCount" style="font-weight:700;color:var(--accent)">0</span> 筆</div>
+      </div>
+
       <!-- Order cards to pick primary -->
       <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">選擇主訂單</div>
       <div id="mergeOrderCards"></div>
@@ -4349,18 +4357,88 @@ async function confirmSmartMergeAll() {
   alert(`✅ 成功合併 ${successCount} 組訂單`);
 }
 
+// Tracks manually picked orders in the merge modal
+let _mergePickedIds = new Set();
+
 function openMergeModal() {
   const ids = [...selectedOrders];
-  if (ids.length < 2) { alert('請至少選取 2 筆訂單才能合併'); return; }
 
-  const selected = ids.map(id => orders.find(o => o.id === id)).filter(Boolean);
-
-  _mergeSelectedPrimary = selected[0]?.id || null;
-
-  renderMergeCards(selected);
-  renderMergePreview(selected);
+  if (ids.length >= 2) {
+    // Mode A: pre-selected orders → go straight to cards
+    _mergePickedIds = new Set(ids);
+    document.getElementById('mergePickSection').style.display = 'none';
+    const selected = ids.map(id => orders.find(o => o.id === id)).filter(Boolean);
+    _mergeSelectedPrimary = selected[0]?.id || null;
+    renderMergeCards(selected);
+    renderMergePreview(selected);
+  } else {
+    // Mode B: nothing selected → show search/pick UI
+    _mergePickedIds = new Set(ids); // include any pre-selected (0 or 1)
+    document.getElementById('mergePickSection').style.display = '';
+    document.getElementById('mergeSearchInput').value = '';
+    document.getElementById('mergeOrderCards').innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">請在上方搜尋並勾選至少 2 筆訂單</div>';
+    document.getElementById('mergeItemsPreview').innerHTML = '';
+    document.getElementById('mergeTotalAmount').innerHTML = '';
+    _mergeSelectedPrimary = null;
+    renderMergeSearchResults();
+    updateMergePickCount();
+  }
 
   document.getElementById('mergeModal').classList.add('show');
+}
+
+function renderMergeSearchResults() {
+  const q = (document.getElementById('mergeSearchInput')?.value || '').toLowerCase().trim();
+  const pool = orders.filter(o => !o.is_merged_secondary && o.status !== 'cancelled');
+  const results = q
+    ? pool.filter(o =>
+        (o.order_id||'').toLowerCase().includes(q) ||
+        (o.buyer_name||'').toLowerCase().includes(q) ||
+        (o.buyer_phone||'').toLowerCase().includes(q)
+      ).slice(0, 30)
+    : pool.slice(0, 30);
+
+  document.getElementById('mergeSearchResults').innerHTML = results.length
+    ? results.map(o => {
+        const checked = _mergePickedIds.has(o.id);
+        return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);
+          background:${checked ? 'var(--accent-light)' : ''}"
+          onmouseover="if(!${checked})this.style.background='var(--surface2)'"
+          onmouseout="this.style.background='${checked ? 'var(--accent-light)' : ''}'">
+          <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleMergePick('${o.id}',this.checked)"
+            style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${o.order_id} &nbsp;${platTag(o.platform)}</div>
+            <div style="font-size:12px;color:var(--text2)">${o.buyer_name||'-'} &nbsp;$${(o.amount||0).toLocaleString()}</div>
+          </div>
+        </label>`;
+      }).join('')
+    : '<div style="padding:12px;font-size:13px;color:var(--text3);text-align:center">找不到符合的訂單</div>';
+}
+
+function toggleMergePick(orderId, checked) {
+  if (checked) _mergePickedIds.add(orderId);
+  else _mergePickedIds.delete(orderId);
+  updateMergePickCount();
+
+  // Re-render cards and preview if we have 2+
+  const picked = [..._mergePickedIds].map(id => orders.find(o => o.id === id)).filter(Boolean);
+  if (picked.length >= 2) {
+    if (!_mergeSelectedPrimary || !_mergePickedIds.has(_mergeSelectedPrimary)) {
+      _mergeSelectedPrimary = picked[0].id;
+    }
+    renderMergeCards(picked);
+    renderMergePreview(picked);
+  } else {
+    document.getElementById('mergeOrderCards').innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">請再勾選至少 ' + (2 - picked.length) + ' 筆訂單</div>';
+    document.getElementById('mergeItemsPreview').innerHTML = '';
+    document.getElementById('mergeTotalAmount').innerHTML = '';
+  }
+}
+
+function updateMergePickCount() {
+  const el = document.getElementById('mergePickCount');
+  if (el) el.textContent = _mergePickedIds.size;
 }
 
 function renderMergeCards(selected) {
@@ -4396,7 +4474,7 @@ function renderMergeCards(selected) {
 
 function setMergePrimary(id) {
   _mergeSelectedPrimary = id;
-  const ids = [...selectedOrders];
+  const ids = _mergePickedIds.size >= 2 ? [..._mergePickedIds] : [...selectedOrders];
   const selected = ids.map(i => orders.find(o => o.id === i)).filter(Boolean);
   renderMergeCards(selected);
   renderMergePreview(selected);
@@ -4458,7 +4536,8 @@ function getOrderItems(o) {
 
 function confirmMerge() {
   if (!_mergeSelectedPrimary) { alert('請選擇主訂單'); return; }
-  const ids = [...selectedOrders];
+  const ids = _mergePickedIds.size >= 2 ? [..._mergePickedIds] : [...selectedOrders];
+  if (ids.length < 2) { alert('請至少選取 2 筆訂單'); return; }
   const selected = ids.map(id => orders.find(o => o.id === id)).filter(Boolean);
   const primary = selected.find(o => o.id === _mergeSelectedPrimary);
   if (!primary) { alert('找不到主訂單'); return; }
