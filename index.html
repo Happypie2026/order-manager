@@ -3245,6 +3245,13 @@ function updateMapping(key, val) {
   importState.mapping[key] = val;
   const previewRow = importState.csvData[0] || {};
   const preview = val ? (previewRow[val] || '') : '';
+
+  // 即時儲存對應規則，讓下次匯入自動套用
+  if (importState.platform) {
+    mappings[importState.platform] = { ...importState.mapping };
+    localStorage.setItem('mappings', JSON.stringify(mappings));
+    saveMappingToDB(importState.platform, importState.mapping);
+  }
 }
 
 function doImport() {
