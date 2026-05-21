@@ -1025,6 +1025,14 @@
 
       <!-- Column mapping cards -->
       <div id="columnMappingSection">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="colMappingSelectAll" onchange="toggleAllColMappings(this.checked)" style="accent-color:var(--accent);width:15px;height:15px">
+            全選
+          </label>
+          <span id="colMappingSelectedCount" style="font-size:12px;color:var(--text3)">已選 0 筆</span>
+          <button class="btn btn-sm btn-danger" id="colMappingDeleteBtn" onclick="deleteSelectedColMappings()" style="display:none">🗑 刪除已選</button>
+        </div>
         <div id="mappingCards"></div>
       </div>
 
@@ -1033,9 +1041,18 @@
         <div class="alert alert-info" style="margin-bottom:1rem">
           以下是所有已設定的「平台商品名稱 → 系統商品」對應規則。可以修改或刪除，刪除後下次匯入相同商品名稱時會再次詢問。
         </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="pnmSelectAll" onchange="toggleAllPnm(this.checked)" style="accent-color:var(--accent);width:15px;height:15px">
+            全選
+          </label>
+          <span id="pnmSelectedCount" style="font-size:12px;color:var(--text3)">已選 0 筆</span>
+          <button class="btn btn-sm btn-danger" id="pnmDeleteBtn" onclick="deleteSelectedPnm()" style="display:none">🗑 刪除已選</button>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr>
+              <th style="width:36px"><input type="checkbox" id="pnmSelectAllTable" onchange="toggleAllPnm(this.checked)" style="accent-color:var(--accent)"></th>
               <th>平台商品名稱</th>
               <th>規格</th>
               <th>對應系統商品</th>
@@ -6921,18 +6938,74 @@ function exportReport() {
 }
 
 // ==================== MAPPING CARDS ====================
+let _colMappingSelected = new Set();
+
 function renderMappingCards() {
-  document.getElementById('mappingCards').innerHTML = Object.keys(PLATFORMS).map(k => {
-    const m = mappings[k];
-    return `<div class="card card-pad mb-2">
-      <div class="card-title flex justify-between items-center">
-        <span>${platTag(k)} 欄位對應</span>
-        ${m ? '<span class="tag tag-new">已設定</span>' : '<span style="font-size:12px;color:var(--text3)">未設定（首次匯入時會要求設定）</span>'}
-      </div>
-      ${m ? `<div class="table-wrap" style="border:none;border-radius:0"><table style="font-size:12.5px"><thead><tr><th>系統欄位</th><th>對應CSV欄位</th></tr></thead><tbody>${SYSTEM_FIELDS_FOR(k).filter(f=>m[f.key]).map(f=>`<tr><td>${f.label}${f.required?'<span style="color:var(--danger);margin-left:3px">*</span>':''}</td><td class="mono">${m[f.key]||'-'}</td></tr>`).join('')}</tbody></table></div>
-      <div style="margin-top:10px"><button class="btn btn-sm btn-danger" onclick="clearMapping('${k}')">清除對應規則</button></div>` : ''}
-    </div>`;
-  }).join('');
+  const platforms = Object.keys(PLATFORMS).filter(k => mappings[k]); // only show platforms with mappings
+  const unset = Object.keys(PLATFORMS).filter(k => !mappings[k]);
+
+  document.getElementById('mappingCards').innerHTML =
+    (platforms.length === 0 ? '<div class="empty-state" style="padding:2rem"><p>尚無欄位對應設定</p></div>' : '') +
+    platforms.map(k => {
+      const m = mappings[k];
+      const checked = _colMappingSelected.has(k);
+      return `<div class="card card-pad mb-2" id="colCard_${k}" style="border:2px solid ${checked ? 'var(--accent-mid)' : 'var(--border)'}">
+        <div class="card-title flex justify-between items-center">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleColMappingSelect('${k}',this.checked)"
+              style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0">
+            <span>${platTag(k)} 欄位對應</span>
+            <span class="tag tag-new">已設定</span>
+          </label>
+          <button class="btn btn-sm btn-danger" onclick="clearMapping('${k}')">清除</button>
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0"><table style="font-size:12.5px"><thead><tr><th>系統欄位</th><th>對應CSV欄位</th></tr></thead><tbody>${SYSTEM_FIELDS_FOR(k).filter(f=>m[f.key]).map(f=>`<tr><td>${f.label}${f.required?'<span style="color:var(--danger);margin-left:3px">*</span>':''}</td><td class="mono">${m[f.key]||'-'}</td></tr>`).join('')}</tbody></table></div>
+      </div>`;
+    }).join('') +
+    (unset.length ? `<div style="margin-top:1rem;font-size:12px;color:var(--text3)">尚未設定：${unset.map(k=>PLATFORMS[k].label).join('、')}（首次匯入時會要求設定）</div>` : '');
+
+  updateColMappingBar();
+}
+
+function toggleColMappingSelect(plat, checked) {
+  if (checked) _colMappingSelected.add(plat);
+  else _colMappingSelected.delete(plat);
+  const card = document.getElementById(`colCard_${plat}`);
+  if (card) card.style.borderColor = checked ? 'var(--accent-mid)' : 'var(--border)';
+  updateColMappingBar();
+}
+
+function toggleAllColMappings(checked) {
+  const platforms = Object.keys(PLATFORMS).filter(k => mappings[k]);
+  platforms.forEach(k => { if (checked) _colMappingSelected.add(k); else _colMappingSelected.delete(k); });
+  renderMappingCards();
+  document.getElementById('colMappingSelectAll').checked = checked;
+  const t = document.getElementById('pnmSelectAllTable'); if(t) t.checked = checked;
+}
+
+function updateColMappingBar() {
+  const n = _colMappingSelected.size;
+  const countEl = document.getElementById('colMappingSelectedCount');
+  const btn = document.getElementById('colMappingDeleteBtn');
+  const all = document.getElementById('colMappingSelectAll');
+  if (countEl) countEl.textContent = n > 0 ? `已選 ${n} 筆` : '';
+  if (btn) btn.style.display = n > 0 ? '' : 'none';
+  const total = Object.keys(PLATFORMS).filter(k => mappings[k]).length;
+  if (all) all.checked = total > 0 && n === total;
+}
+
+function deleteSelectedColMappings() {
+  if (!_colMappingSelected.size) return;
+  const names = [..._colMappingSelected].map(k => PLATFORMS[k].label).join('、');
+  if (!confirm(`確定刪除以下平台的欄位對應設定？
+${names}`)) return;
+  _colMappingSelected.forEach(k => {
+    delete mappings[k];
+    localStorage.setItem('mappings', JSON.stringify(mappings));
+    try { SB.delete('mappings', k); } catch(e) {}
+  });
+  _colMappingSelected.clear();
+  renderMappingCards();
 }
 
 function clearMapping(plat) {
@@ -6951,6 +7024,34 @@ function switchMappingTab(tab) {
   if (!isCol) renderProductNameMappings();
 }
 
+function toggleAllPnm(checked) {
+  document.querySelectorAll('.pnm-cb').forEach(cb => cb.checked = checked);
+  const allCbs = [document.getElementById('pnmSelectAll'), document.getElementById('pnmSelectAllTable')];
+  allCbs.forEach(el => { if(el) el.checked = checked; });
+  updatePnmBar();
+}
+
+function updatePnmBar() {
+  const checked = document.querySelectorAll('.pnm-cb:checked');
+  const total   = document.querySelectorAll('.pnm-cb');
+  const n = checked.length;
+  const countEl = document.getElementById('pnmSelectedCount');
+  const btn = document.getElementById('pnmDeleteBtn');
+  const allCbs = [document.getElementById('pnmSelectAll'), document.getElementById('pnmSelectAllTable')];
+  if (countEl) countEl.textContent = n > 0 ? `已選 ${n} 筆` : '';
+  if (btn) btn.style.display = n > 0 ? '' : 'none';
+  allCbs.forEach(el => { if(el) el.checked = total.length > 0 && n === total.length; });
+}
+
+function deleteSelectedPnm() {
+  const checked = [...document.querySelectorAll('.pnm-cb:checked')].map(cb => decodeURIComponent(cb.value));
+  if (!checked.length) return;
+  if (!confirm(`確定刪除 ${checked.length} 筆商品名稱對應規則？`)) return;
+  checked.forEach(key => { delete productNameMappings[key]; });
+  localStorage.setItem('productNameMappings', JSON.stringify(productNameMappings));
+  renderProductNameMappings();
+}
+
 function renderProductNameMappings() {
   const keys = Object.keys(productNameMappings);
   const tbody = document.getElementById('pnmBody');
@@ -6967,6 +7068,7 @@ function renderProductNameMappings() {
       `<option value="${pr.id}" ${m?.product_id === pr.id ? 'selected' : ''}>${pr.name}${pr.sku?' ['+pr.sku+']':''}</option>`
     ).join('');
     return `<tr data-key="${encodeURIComponent(key)}">
+      <td><input type="checkbox" class="pnm-cb" value="${encodeURIComponent(key)}" onchange="updatePnmBar()" style="accent-color:var(--accent)"></td>
       <td style="font-size:13px;font-weight:500">${name || '（空）'}</td>
       <td style="font-size:12px;color:var(--text2)">${spec || '-'}</td>
       <td>
