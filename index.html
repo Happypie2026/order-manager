@@ -6426,10 +6426,10 @@ function doVendorExport() {
     exportHsinchu(allFiltered, dateLabel);
   } else if (_exportType === 'blackcat_warm') {
     if (!allFiltered.length) { alert('沒有符合條件的訂單可匯出'); return; }
-    exportBlackCat(allFiltered, dateLabel, 'warm');
+    exportBlackCat(allFiltered, dateLabel, 'warm', dateFrom);
   } else if (_exportType === 'blackcat_cold') {
     if (!allFiltered.length) { alert('沒有符合條件的訂單可匯出'); return; }
-    exportBlackCat(allFiltered, dateLabel, 'cold');
+    exportBlackCat(allFiltered, dateLabel, 'cold', dateFrom);
   }
 
   closeModal('vendorExportModal');
@@ -6568,11 +6568,14 @@ const BLACKCAT_SENDER = {
   address: '台北市中山區南京西路1-1號6樓621室',
 };
 
-function exportBlackCat(rows, dateStr, temp) {
+function exportBlackCat(rows, dateLabel, temp, shipDateRaw) {
   const wb       = XLSX.utils.book_new();
   const tempCode = temp === 'cold' ? 3 : 1; // 1=常溫, 3=冷凍
   const sheetName = temp === 'cold' ? '黑貓冷凍' : '黑貓常溫';
-  const filename  = temp === 'cold' ? `黑貓宅急便_冷凍_${dateStr}.xlsx` : `黑貓宅急便_常溫_${dateStr}.xlsx`;
+  const filename  = temp === 'cold' ? `黑貓宅急便_冷凍_${dateLabel}.xlsx` : `黑貓宅急便_常溫_${dateLabel}.xlsx`;
+  // Use shipDate for 出貨日期/配達日; fallback to today if not provided
+  const today = new Date().toISOString().slice(0, 10);
+  const dateStr = (shipDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(shipDateRaw)) ? shipDateRaw : today;
 
   const header = [
     '訂單編號',
