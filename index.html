@@ -4087,10 +4087,16 @@ function openQuickHoldMenu(orderId, btn) {
       </div>` : ''}
   `;
 
-  // Position below the button
+  // Position below the button (fixed = viewport coords, no scrollY needed)
   const rect = btn.getBoundingClientRect();
-  menu.style.top  = (rect.bottom + 4 + window.scrollY) + 'px';
-  menu.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
+  const menuH = holdingAreas.length * 38 + 60; // estimated height
+  const spaceBelow = window.innerHeight - rect.bottom;
+  if (spaceBelow < menuH && rect.top > menuH) {
+    menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+  } else {
+    menu.style.top = (rect.bottom + 4) + 'px';
+  }
+  menu.style.left = Math.min(rect.left, window.innerWidth - 210) + 'px';
 
   document.body.appendChild(menu);
 
