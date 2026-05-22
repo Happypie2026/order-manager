@@ -735,9 +735,10 @@
         <!-- hidden holdingAreaList for renderHoldingAreas to write to (used by nav) -->
         <div id="holdingAreaList" style="display:none"></div>
           <div class="filters" style="margin-bottom:8px">
-            <div class="search-wrap" style="min-width:180px;flex:1">
+            <div class="search-wrap" style="min-width:180px;flex:1;position:relative">
               <span class="search-icon">🔍</span>
-              <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="renderOrders()" onkeydown="if(event.key==='Enter')renderOrders()">
+              <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="renderOrders();toggleOrderSearchClear()" onkeydown="if(event.key==='Enter')renderOrders()">
+              <button id="orderSearchClearBtn" onclick="clearOrderSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);line-height:1;padding:0" title="清除搜尋">×</button>
             </div>
             <select id="orderStatusFilter" onchange="renderOrders()">
               <option value="__active__">待確認 ＋ 處理中</option>
@@ -3841,6 +3842,20 @@ function renderPageBtns(containerId, pages, current, cb) {
 function toggleSelect(id, cb) {
   if (cb.checked) selectedOrders.add(id); else selectedOrders.delete(id);
   updateBatchBar();
+}
+
+function toggleOrderSearchClear() {
+  const val = document.getElementById('orderSearch')?.value || '';
+  const btn = document.getElementById('orderSearchClearBtn');
+  if (btn) btn.style.display = val ? 'block' : 'none';
+}
+
+function clearOrderSearch() {
+  const el = document.getElementById('orderSearch');
+  if (el) { el.value = ''; el.focus(); }
+  const btn = document.getElementById('orderSearchClearBtn');
+  if (btn) btn.style.display = 'none';
+  renderOrders();
 }
 
 function toggleSelectAll(cb) {
