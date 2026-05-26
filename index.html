@@ -3780,13 +3780,20 @@ function renderOrders() {
       if (!vendorMatch) return false;
     }
 
-    // Search: order_id, buyer_name, product_name keyword
+    // Search: order_id, buyer_name, product_name keyword, merged order ids
     if (q) {
-      const inId   = (o.order_id||'').toLowerCase().includes(q);
-      const inName = (o.buyer_name||'').toLowerCase().includes(q);
-      const inProd = (o.product_name||'').toLowerCase().includes(q);
-      const inSpec = (o.product_spec||'').toLowerCase().includes(q);
-      if (!inId && !inName && !inProd && !inSpec) return false;
+      const inId      = (o.order_id||'').toLowerCase().includes(q);
+      const inName    = (o.buyer_name||'').toLowerCase().includes(q);
+      const inProd    = (o.product_name||'').toLowerCase().includes(q);
+      const inSpec    = (o.product_spec||'').toLowerCase().includes(q);
+      // Also search merged order IDs (合併進來的其他訂單編號)
+      const inMerged  = (o.merged_from||[]).some(id => id.toLowerCase().includes(q));
+      // Also search items product names
+      const inItems   = getOrderItems(o).some(it =>
+        (it.product_name||'').toLowerCase().includes(q) ||
+        (it.product_spec||'').toLowerCase().includes(q)
+      );
+      if (!inId && !inName && !inProd && !inSpec && !inMerged && !inItems) return false;
     }
 
     return true;
