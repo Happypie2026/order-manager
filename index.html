@@ -3971,7 +3971,8 @@ function renderHoldingAreas() {
           <span style="font-size:11px;color:var(--text3)">${count}</span>
         </div>
         ${ha.reason?`<div style="font-size:11px;color:var(--text3);margin-bottom:5px;line-height:1.4">${ha.reason}</div>`:''}
-        <div style="display:flex;gap:4px">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button onclick="event.stopPropagation();toggleHoldingAreaLock('${ha.id}')" class="btn btn-sm" style="font-size:10.5px;padding:2px 7px;${ha.locked?'background:var(--warning-light);color:var(--warning);border-color:var(--warning)':''}" title="${ha.locked?'點擊解鎖':'點擊鎖定'}">${ha.locked?'🔒 解鎖':'🔓 鎖定'}</button>
           <button onclick="event.stopPropagation();openHoldingAreaModal('${ha.id}')" class="btn btn-sm" style="font-size:10.5px;padding:2px 7px">編輯</button>
           <button onclick="event.stopPropagation();deleteHoldingArea('${ha.id}')" class="btn btn-sm btn-danger" style="font-size:10.5px;padding:2px 7px">刪除</button>
         </div>
@@ -4017,6 +4018,16 @@ function resetOrderFilters() {
 function setHoldingAreaFilter(id) {
   orderFilter.holdingAreaId = id;
   orderFilter.page = 1;
+  renderHoldingAreas();
+  renderOrders();
+}
+
+async function toggleHoldingAreaLock(id) {
+  const ha = holdingAreas.find(h => h.id === id);
+  if (!ha) return;
+  ha.locked = !ha.locked;
+  localStorage.setItem('holdingAreas', JSON.stringify(holdingAreas));
+  try { await SB.upsert('holding_areas', ha); } catch(e) { console.warn('toggleLock:', e.message); }
   renderHoldingAreas();
   renderOrders();
 }
