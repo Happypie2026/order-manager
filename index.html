@@ -2637,10 +2637,24 @@ function showOrdersView(view) {
 function updateNavHoldingAreas() {
   const el = document.getElementById('navHoldingAreaItems');
   if (!el) return;
-  el.innerHTML = holdingAreas.map(ha => `
-    <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
-      ${ha.locked ? '🔒 ' : ''}${ha.name}
-    </div>`).join('');
+  const visibleOrders = orders.filter(o => !o.is_merged_secondary);
+  el.innerHTML = holdingAreas.map(ha => {
+    const count = visibleOrders.filter(o => o.holding_area_id === ha.id).length;
+    return `
+    <div class="nav-subitem" style="padding-left:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:4px;padding-right:6px">
+      <span style="flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="showHoldingAreaView('${ha.id}')">
+        ${ha.locked ? '🔒 ' : '📌 '}${ha.name}
+        <span style="font-size:10px;opacity:0.6;margin-left:3px">${count}</span>
+      </span>
+      <button onclick="event.stopPropagation();toggleHoldingAreaLock('${ha.id}')"
+        title="${ha.locked ? '點擊解鎖' : '點擊鎖定'}"
+        style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:12px;padding:1px 4px;flex-shrink:0;color:${ha.locked ? 'var(--warning)' : 'var(--text3)'};line-height:1.4"
+        onmouseover="this.style.borderColor='var(--border)'"
+        onmouseout="this.style.borderColor='transparent'">
+        ${ha.locked ? '🔒' : '🔓'}
+      </button>
+    </div>`;
+  }).join('');
   updateMobileHoldingAreas();
 }
 
