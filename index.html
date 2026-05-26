@@ -1608,7 +1608,8 @@
     <div class="modal-body">
       <div style="font-size:13.5px;color:var(--text2);margin-bottom:1rem">選擇要將 <strong id="batchHoldCount">0</strong> 筆訂單移入的暫存區：</div>
       <div id="batchHoldOptions"></div>
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+        <button onclick="batchMoveToHoldingArea('')" style="background:var(--danger-light);border:1.5px solid #f5c6c6;color:var(--danger);padding:8px 14px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;width:100%;font-weight:600">✕ 移出暫存區（回到未分類）</button>
         <button onclick="openHoldingAreaModal();closeModal('batchHoldModal')" style="background:none;border:1.5px dashed var(--border2);color:var(--text2);padding:7px 14px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;width:100%">＋ 新增暫存區</button>
       </div>
     </div>
