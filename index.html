@@ -1608,8 +1608,7 @@
     <div class="modal-body">
       <div style="font-size:13.5px;color:var(--text2);margin-bottom:1rem">選擇要將 <strong id="batchHoldCount">0</strong> 筆訂單移入的暫存區：</div>
       <div id="batchHoldOptions"></div>
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
-        <button onclick="batchMoveToHoldingArea('')" style="background:var(--danger-light);border:1.5px solid #f5c6c6;color:var(--danger);padding:8px 14px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;width:100%;font-weight:600">✕ 移出暫存區（回到未分類）</button>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
         <button onclick="openHoldingAreaModal();closeModal('batchHoldModal')" style="background:none;border:1.5px dashed var(--border2);color:var(--text2);padding:7px 14px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;width:100%">＋ 新增暫存區</button>
       </div>
     </div>
@@ -2175,6 +2174,7 @@ const ALL_FIELDS = [
   { key: 'shipping_district',  label: '鄉鎮市區',      },  // 誠品專用
   { key: 'shipping_detail',    label: '地址',          },  // 誠品專用（街道門牌）
   { key: 'product_name',       label: '商品品名',      },
+  { key: 'product_sku',        label: '商品料號',      },
   { key: 'product_spec',       label: '商品規格',      },
   { key: 'product_qty',        label: '商品數量',      },
   { key: 'shipping_interval',  label: '出貨區間',      },
@@ -2234,6 +2234,7 @@ function getFieldsForPlatform(platId) {
     // Address: single or split
     ...(useSplitAddr ? ['shipping_city','shipping_district','shipping_detail'] : ['shipping_address']),
     'product_name',
+    'product_sku',
     // 康承、官網不需要商品規格欄位（格式已含在商品名稱內）
     ...(platId === 'kangcheng' || platId === 'website' ? [] : ['product_spec']),
     'product_qty',
@@ -2638,31 +2639,10 @@ function showOrdersView(view) {
 function updateNavHoldingAreas() {
   const el = document.getElementById('navHoldingAreaItems');
   if (!el) return;
-  const visibleOrders = orders.filter(o => !o.is_merged_secondary);
-  el.innerHTML = holdingAreas.map(ha => {
-    const count = visibleOrders.filter(o => o.holding_area_id === ha.id).length;
-    return `
-    <div class="nav-subitem" style="padding-left:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:2px;padding-right:4px">
-      <span style="flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" onclick="showHoldingAreaView('${ha.id}')">
-        ${ha.locked ? '🔒 ' : '📌 '}${ha.name}
-        <span style="font-size:10px;opacity:0.6;margin-left:3px">${count}</span>
-      </span>
-      <div style="display:flex;gap:2px;flex-shrink:0">
-        <button onclick="event.stopPropagation();toggleHoldingAreaLock('${ha.id}')"
-          title="${ha.locked ? '點擊解鎖' : '點擊鎖定'}"
-          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:11px;padding:1px 4px;color:${ha.locked ? 'var(--warning)' : 'rgba(255,255,255,0.35)'};line-height:1.4"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)'"
-          onmouseout="this.style.borderColor='transparent'">
-          ${ha.locked ? '🔒' : '🔓'}
-        </button>
-        <button onclick="event.stopPropagation();openHaNavMenu('${ha.id}', this)"
-          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:14px;padding:1px 5px;color:rgba(255,255,255,0.35);line-height:1.4"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.7)'"
-          onmouseout="this.style.borderColor='transparent';this.style.color='rgba(255,255,255,0.35)'"
-          title="更多操作">⋯</button>
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = holdingAreas.map(ha => `
+    <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
+      ${ha.locked ? '🔒 ' : ''}${ha.name}
+    </div>`).join('');
   updateMobileHoldingAreas();
 }
 
@@ -3263,6 +3243,7 @@ function guessColumn(key, headers) {
     buyer_name:            ['收件人','買家姓名','收件姓名','姓名','buyer_name','客戶名稱'],
     amount:                ['訂單金額','買家實付金額','訂單總金額','總金額','金額','amount','發票金額','折扣前總金額'],
     product_name:          ['商品名稱','品名','商品品名','商品','product_name','item_name','品項名稱'],
+    product_sku:           ['商品料號','料號','SKU','sku','商品編號','貨號','item_sku','product_code'],
     product_spec:          ['商品規格','規格','顏色尺寸','款式','spec','variation','商品屬性','sku'],
     product_qty:           ['數量','購買數量','商品數量','qty','quantity','件數'],
     customer_note:         ['買家備註','客戶備註','配送備註','備註','訂單備註','note','remark','留言','客戶配送需求'],
@@ -3408,6 +3389,7 @@ function doImport() {
       buyer_email:      m.buyer_email      ? (row[m.buyer_email]      || '').trim() : '',
       amount: parseFloat((m.amount ? row[m.amount] : '0') || '0') || 0,
       product_name:  pName,
+      product_sku:   m.product_sku ? (row[m.product_sku] || '').trim() : '',
       product_spec:  pSpec,
       platform_qty:  pQty,
       product_qty:   primaryLinked?.qty || pQty,
@@ -3780,20 +3762,13 @@ function renderOrders() {
       if (!vendorMatch) return false;
     }
 
-    // Search: order_id, buyer_name, product_name keyword, merged order ids
+    // Search: order_id, buyer_name, product_name keyword
     if (q) {
-      const inId      = (o.order_id||'').toLowerCase().includes(q);
-      const inName    = (o.buyer_name||'').toLowerCase().includes(q);
-      const inProd    = (o.product_name||'').toLowerCase().includes(q);
-      const inSpec    = (o.product_spec||'').toLowerCase().includes(q);
-      // Also search merged order IDs (合併進來的其他訂單編號)
-      const inMerged  = (o.merged_from||[]).some(id => id.toLowerCase().includes(q));
-      // Also search items product names
-      const inItems   = getOrderItems(o).some(it =>
-        (it.product_name||'').toLowerCase().includes(q) ||
-        (it.product_spec||'').toLowerCase().includes(q)
-      );
-      if (!inId && !inName && !inProd && !inSpec && !inMerged && !inItems) return false;
+      const inId   = (o.order_id||'').toLowerCase().includes(q);
+      const inName = (o.buyer_name||'').toLowerCase().includes(q);
+      const inProd = (o.product_name||'').toLowerCase().includes(q);
+      const inSpec = (o.product_spec||'').toLowerCase().includes(q);
+      if (!inId && !inName && !inProd && !inSpec) return false;
     }
 
     return true;
@@ -4049,54 +4024,6 @@ function setHoldingAreaFilter(id) {
   orderFilter.page = 1;
   renderHoldingAreas();
   renderOrders();
-}
-
-function openHaNavMenu(haId, btn) {
-  document.querySelectorAll('.ha-nav-menu').forEach(el => el.remove());
-
-  const ha = holdingAreas.find(h => h.id === haId);
-  if (!ha) return;
-
-  const menu = document.createElement('div');
-  menu.className = 'ha-nav-menu';
-  menu.style.cssText = `
-    position:fixed;z-index:9999;
-    background:var(--surface);border:1px solid var(--border);
-    border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);
-    min-width:150px;padding:4px 0;font-size:13px;
-  `;
-
-  menu.innerHTML = `
-    <div onclick="openHoldingAreaModal('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px"
-      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      ✏️ 編輯暫存區
-    </div>
-    <div onclick="openHoldingAreaModal();document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px"
-      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      ➕ 新增暫存區
-    </div>
-    <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-    <div onclick="deleteHoldingArea('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--danger)"
-      onmouseover="this.style.background='var(--danger-light)'" onmouseout="this.style.background=''">
-      🗑 刪除此暫存區
-    </div>
-  `;
-
-  const rect = btn.getBoundingClientRect();
-  menu.style.top  = (rect.bottom + 4) + 'px';
-  menu.style.left = Math.max(0, rect.right - 160) + 'px';
-  document.body.appendChild(menu);
-
-  const close = (e) => {
-    if (!menu.contains(e.target) && e.target !== btn) {
-      menu.remove();
-      document.removeEventListener('click', close, true);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', close, true), 10);
 }
 
 async function toggleHoldingAreaLock(id) {
