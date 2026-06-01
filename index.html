@@ -2889,7 +2889,12 @@ async function deleteVendorFromDB(id) {
 }
 async function saveProducts() {
   localStorage.setItem('products', JSON.stringify(products));
-  try { if (products.length) await SB.upsert('products', products); } catch(e) { console.warn('saveProducts:', e.message); }
+  try {
+    if (products.length) await SB.upsert('products', products);
+  } catch(e) {
+    console.error('saveProducts error:', e.message);
+    alert('⚠️ 商品儲存到 Supabase 失敗：' + e.message + '\n資料已暫存在瀏覽器，但重整後可能消失。');
+  }
 }
 async function saveProductToDB(p) {
   const idx = products.findIndex(x => x.id === p.id);
@@ -6066,7 +6071,11 @@ async function confirmBulkImport() {
     products.push({
       id: generateId(),
       sku: r.sku, name: r.name, short_name: r.short_name,
-      vendor_id: r.vendor_id, cost: r.cost, note: r.note,
+      vendor_id: r.vendor_id, cost: r.cost, note: r.note || '',
+      track_stock: false,
+      stock_alert: 10,
+      stock_unit: '箱',
+      stock_unit_qty: 1,
       created_at: new Date().toISOString(),
     });
   });
