@@ -3318,7 +3318,11 @@ function doImport() {
 
   // Convert rows
   let added = 0, skipped = 0;
-  const existingIds = new Set(orders.filter(o => o.platform === importState.platform).map(o => o.order_id));
+  // Check duplicates across ALL platforms and ALL statuses (including shipped, cancelled, holding areas)
+  const existingIds = new Set(orders.map(o => o.order_id).filter(Boolean));
+  // Also build a map to show where duplicate exists
+  const existingOrderMap = {};
+  orders.forEach(o => { if (o.order_id) existingOrderMap[o.order_id] = o; });
 
   // ── 康承特殊處理：多列合併 ──────────────────────────────────────────
   // 康承格式：同一訂單的第一列有客戶資料，後續列訂單編號空白，只有商品名+數量
@@ -3356,7 +3360,10 @@ function doImport() {
     if (existingIds.has(orderId)) {
       skipped++;
       importState._duplicates = importState._duplicates || [];
-      importState._duplicates.push(orderId);
+      const existingO = existingOrderMap[orderId];
+      const platLabel = existingO ? (PLATFORMS[existingO.platform]?.label || existingO.platform) : '';
+      const statusLabel = existingO ? (STATUS_LABELS[existingO.status] || existingO.status) : '';
+      importState._duplicates.push({ id: orderId, platform: platLabel, status: statusLabel });
       return;
     }
 
@@ -3691,7 +3698,13 @@ function finishImport() {
     warnEl.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px">⚠️ 以下 ${duplicates.length} 筆訂單已存在，略過不重複匯入：</div>
       <div style="max-height:120px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8">
-        ${duplicates.map(id => `<div>• ${id}</div>`).join('')}
+        ${duplicates.map(d => {
+          const id = typeof d === 'string' ? d : d.id;
+          const info = typeof d === 'object' && (d.platform || d.status)
+            ? ` <span style="color:var(--text3);font-size:11px">[${[d.platform, d.status].filter(Boolean).join('・')}]</span>`
+            : '';
+          return `<div>• ${id}${info}</div>`;
+        }).join('')}
       </div>`;
   } else if (warnEl) {
     warnEl.style.display = 'none';
