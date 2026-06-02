@@ -3934,22 +3934,47 @@ function clearSelection() {
   updateBatchBar(); renderOrders();
 }
 
-function applyBatchStatus() {
+async function applyBatchStatus() {
   const sel = document.getElementById('batchStatusSel');
   const status = sel?.value;
   if (!status) { alert('請先選擇要更改的狀態'); return; }
   if (!selectedOrders.size) { alert('請先勾選要更改的訂單'); return; }
   if (!confirm(`確定將 ${selectedOrders.size} 筆訂單狀態改為「${STATUS_LABELS[status]}」？`)) return;
-  orders = orders.map(o => selectedOrders.has(o.id) ? { ...o, status } : o);
-  saveOrders();
+
+  // Update local array
+  const ids = [...selectedOrders];
+  orders = orders.map(o => ids.includes(o.id) ? { ...o, status } : o);
+  localStorage.setItem('orders', JSON.stringify(orders));
+
+  // Save each updated order individually to Supabase
+  let failed = 0;
+  for (const id of ids) {
+    const o = orders.find(x => x.id === id);
+    if (!o) continue;
+    try {
+      await SB.upsert('orders', toDbOrder(o));
+    } catch(e) {
+      console.error('applyBatchStatus save failed:', e.message);
+      failed++;
+    }
+  }
+
+  if (failed > 0) alert(`⚠️ 有 ${failed} 筆訂單狀態未能同步到 Supabase，請再試一次。`);
+
   if (sel) sel.value = '';
   selectedOrders.clear(); updateBatchBar(); renderOrders(); updatePendingBadge(); renderDashboard();
 }
 
-function bulkUpdateStatus(status) {
+async function bulkUpdateStatus(status) {
   if (!selectedOrders.size) { alert('請先勾選訂單'); return; }
-  orders = orders.map(o => selectedOrders.has(o.id) ? { ...o, status } : o);
-  saveOrders(); selectedOrders.clear(); updateBatchBar(); renderOrders(); updatePendingBadge();
+  const ids = [...selectedOrders];
+  orders = orders.map(o => ids.includes(o.id) ? { ...o, status } : o);
+  localStorage.setItem('orders', JSON.stringify(orders));
+  for (const id of ids) {
+    const o = orders.find(x => x.id === id);
+    if (o) { try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('bulkUpdateStatus:', e.message); } }
+  }
+  selectedOrders.clear(); updateBatchBar(); renderOrders(); updatePendingBadge();
 }
 
 // ==================== HOLDING AREAS ====================
