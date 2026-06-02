@@ -2754,10 +2754,14 @@ const SB = {
   async upsert(table, data) {
     const res = await fetch(`${this.url()}/rest/v1/${table}`, {
       method: 'POST',
-      headers: { ...this.headers(), Prefer: 'resolution=merge-duplicates' },
+      headers: { ...this.headers(), Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(Array.isArray(data) ? data : [data]),
     });
-    if (!res.ok) throw new Error(`UPSERT ${table} failed: ${res.status}`);
+    if (!res.ok) {
+      let errMsg = `UPSERT ${table} failed: ${res.status}`;
+      try { const body = await res.json(); errMsg += ' — ' + (body.message || body.error || JSON.stringify(body)); } catch(e) {}
+      throw new Error(errMsg);
+    }
   },
   async delete(table, id) {
     const res = await fetch(`${this.url()}/rest/v1/${table}?id=eq.${id}`, {
