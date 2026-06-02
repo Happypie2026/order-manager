@@ -2790,8 +2790,22 @@ async function loadFromSupabase() {
     return;
   }
   try {
+    // Fetch orders with pagination (Supabase default limit = 1000)
+    async function fetchAllOrders() {
+      const PAGE = 1000;
+      let all = [], offset = 0;
+      while (true) {
+        const batch = await SB.get('orders', `select=*&order=created_at.asc&limit=${PAGE}&offset=${offset}`);
+        if (!Array.isArray(batch) || batch.length === 0) break;
+        all = all.concat(batch);
+        if (batch.length < PAGE) break;
+        offset += PAGE;
+      }
+      return all;
+    }
+
     const [dbOrders, dbVendors, dbProducts, dbMappings, dbPNM, dbHA] = await Promise.all([
-      SB.get('orders', 'select=*&order=created_at.asc&limit=10000'),
+      fetchAllOrders(),
       SB.get('vendors', 'select=*&order=name.asc'),
       SB.get('products', 'select=*&order=name.asc'),
       SB.get('mappings', 'select=*'),
@@ -2804,7 +2818,7 @@ async function loadFromSupabase() {
     mappings     = Object.fromEntries((dbMappings||[]).map(r => [r.platform, r.mapping]));
     productNameMappings = Object.fromEntries((dbPNM||[]).map(r => [r.key, r.items ? { items: r.items } : {}]));
     holdingAreas = Array.isArray(dbHA) ? dbHA : [];
-    console.log(`✅ Loaded from Supabase — ${orders.length} 筆訂單`);
+    console.log(`✅ Loaded from Supabase — ${orders.length} 筆訂單（${Math.ceil(orders.length/1000)} 批次）`);
   } catch(e) {
     console.warn('Supabase load failed, using localStorage:', e.message);
     orders       = JSON.parse(localStorage.getItem('orders') || '[]');
