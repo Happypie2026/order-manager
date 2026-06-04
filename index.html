@@ -781,6 +781,7 @@
               </select>
               <button class="btn btn-sm" onclick="applyBatchStatus()">套用</button>
               <button class="btn btn-sm" onclick="openBatchHoldModal()">📌 移至暫存區</button>
+              <button class="btn btn-sm" onclick="batchRemoveFromHolding()" style="background:var(--danger-light);color:var(--danger);border-color:#f5c6c6">✕ 移出暫存區</button>
               <button class="btn btn-sm" style="background:var(--info-light);color:var(--info);border-color:#b8d0ec;font-weight:500" onclick="openMergeModal()">🔗 合併訂單</button>
               <button class="btn btn-sm btn-danger" onclick="bulkDelete()">🗑 刪除</button>
               <button class="btn btn-sm" onclick="clearSelection()">取消選取</button>
@@ -4319,11 +4320,23 @@ function openBatchHoldModal() {
   document.getElementById('batchHoldModal').classList.add('show');
 }
 
-function batchMoveToHoldingArea(haId) {
-  orders = orders.map(o => selectedOrders.has(o.id) ? {...o, holding_area_id: haId} : o);
-  saveOrders();
+async function batchRemoveFromHolding() {
+  if (!selectedOrders.size) { alert('請先勾選要移出的訂單'); return; }
+  if (!confirm(`確定將 ${selectedOrders.size} 筆訂單移出暫存區？`)) return;
+  await batchMoveToHoldingArea('');
+}
+
+async function batchMoveToHoldingArea(haId) {
+  const ids = [...selectedOrders];
+  orders = orders.map(o => ids.includes(o.id) ? {...o, holding_area_id: haId} : o);
+  localStorage.setItem('orders', JSON.stringify(orders));
+  for (const id of ids) {
+    const o = orders.find(x => x.id === id);
+    if (o) { try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('batchMove:', e.message); } }
+  }
   selectedOrders.clear();
   closeModal('batchHoldModal');
+  updateNavHoldingAreas();
   updateBatchBar(); renderHoldingAreas(); renderOrders();
 }
 
