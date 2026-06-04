@@ -3960,9 +3960,14 @@ function selectAllPages() {
     return true;
   });
   filtered.forEach(o => selectedOrders.add(o.id));
+  // Update selectAll checkbox state
+  const cb = document.getElementById('selectAll');
+  if (cb) cb.checked = true;
   updateBatchBar();
   renderOrders();
-  alert(`✅ 已選取全部 ${filtered.length} 筆訂單`);
+  // Show count in label instead of alert
+  const label = document.getElementById('batchSelLabel');
+  if (label) label.textContent = `已選 ${selectedOrders.size} 筆（全部）`;
 }
 
 function toggleSelectAll(cb) {
