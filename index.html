@@ -766,6 +766,7 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
               <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="accent-color:var(--accent)">
               <span id="batchSelLabel" style="color:var(--text2)">全選此頁</span>
+              <button class="btn btn-sm" onclick="selectAllPages()" style="font-size:11px;padding:2px 8px;margin-left:4px">全選所有頁</button>
             </label>
             <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
             <span id="batchCount" style="font-size:12.5px;color:var(--text3)">尚未選取</span>
@@ -3918,6 +3919,49 @@ function clearOrderSearch() {
   const btn = document.getElementById('orderSearchClearBtn');
   if (btn) btn.style.display = 'none';
   renderOrders();
+}
+
+function selectAllPages() {
+  const q      = (document.getElementById('orderSearch')?.value || '').toLowerCase();
+  const st     = document.getElementById('orderStatusFilter')?.value || '';
+  const vendId = document.getElementById('orderVendorFilter')?.value || '';
+  const haId   = orderFilter.holdingAreaId;
+  const filtered = orders.filter(o => {
+    if (o.is_merged_secondary) return false;
+    if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
+    if (st === '__active__') {
+      if (o.status !== 'pending' && o.status !== 'processing') return false;
+    } else if (st) {
+      if (o.status !== st) return false;
+    }
+    if (haId) {
+      if (haId === '__none__') { if (o.holding_area_id) return false; }
+      else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
+      else { if (o.holding_area_id !== haId) return false; }
+    }
+    if (vendId) {
+      const pids = (o.linked_products||[]).map(l=>l.product_id).concat(o.linked_product_id||'').filter(Boolean);
+      if (!pids.some(pid => products.find(x=>x.id===pid)?.vendor_id===vendId)) return false;
+    }
+    if (q) {
+      const items = getOrderItems(o);
+      const itemMatch = items.some(it =>
+        (it.product_name||'').toLowerCase().includes(q) ||
+        (it.product_spec||'').toLowerCase().includes(q)
+      );
+      if (!(o.order_id||'').toLowerCase().includes(q) &&
+          !(o.buyer_name||'').toLowerCase().includes(q) &&
+          !(o.product_name||'').toLowerCase().includes(q) &&
+          !itemMatch) return false;
+    }
+    const ha = holdingAreas.find(h => h.id === o.holding_area_id);
+    if (ha?.locked) return false;
+    return true;
+  });
+  filtered.forEach(o => selectedOrders.add(o.id));
+  updateBatchBar();
+  renderOrders();
+  alert(`✅ 已選取全部 ${filtered.length} 筆訂單`);
 }
 
 function toggleSelectAll(cb) {
