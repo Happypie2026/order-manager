@@ -2608,6 +2608,7 @@ function toggleOrdersNav() {
 }
 
 function showOrdersView(view) {
+  selectedOrders.clear();
   _currentOrdersView = view;
   _ordersNavOpen = true;
   document.getElementById('navOrdersParent').classList.add('open');
@@ -3771,7 +3772,7 @@ function renderOrderPlatTabs() {
   ).join('');
 }
 
-function setOrderPlat(plat) { orderFilter.plat = plat; orderFilter.page = 1; renderOrderPlatTabs(); renderOrders(); }
+function setOrderPlat(plat) { selectedOrders.clear(); orderFilter.plat = plat; orderFilter.page = 1; renderOrderPlatTabs(); renderOrders(); }
 
 function populateOrderVendorFilter() {
   const sel = document.getElementById('orderVendorFilter');
