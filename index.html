@@ -766,7 +766,6 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
               <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="accent-color:var(--accent)">
               <span id="batchSelLabel" style="color:var(--text2)">全選此頁</span>
-              <button class="btn btn-sm" onclick="selectAllPages()" style="font-size:11px;padding:2px 8px;margin-left:4px">全選所有頁</button>
             </label>
             <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
             <span id="batchCount" style="font-size:12.5px;color:var(--text3)">尚未選取</span>
@@ -781,7 +780,6 @@
               </select>
               <button class="btn btn-sm" onclick="applyBatchStatus()">套用</button>
               <button class="btn btn-sm" onclick="openBatchHoldModal()">📌 移至暫存區</button>
-              <button class="btn btn-sm" onclick="batchRemoveFromHolding()" style="background:var(--danger-light);color:var(--danger);border-color:#f5c6c6">✕ 移出暫存區</button>
               <button class="btn btn-sm" style="background:var(--info-light);color:var(--info);border-color:#b8d0ec;font-weight:500" onclick="openMergeModal()">🔗 合併訂單</button>
               <button class="btn btn-sm btn-danger" onclick="bulkDelete()">🗑 刪除</button>
               <button class="btn btn-sm" onclick="clearSelection()">取消選取</button>
@@ -1839,6 +1837,42 @@
 <div id="drawerOverlay" onclick="closeDrawer()" style="position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299;display:none"></div>
 
 <!-- Edit Order Modal (kept for table row edit button) -->
+<!-- Copy Order Modal -->
+<div class="modal-overlay" id="copyOrderModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title">📋 複製訂單</div>
+      <button class="modal-close" onclick="closeModal('copyOrderModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="copyOrderInfo" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;font-size:13px"></div>
+      <div class="form-row">
+        <label>新訂單編號 *</label>
+        <input type="text" id="copyOrderId" placeholder="請輸入新的訂單編號">
+      </div>
+      <div class="form-row">
+        <label>下單日期</label>
+        <input type="date" id="copyOrderDate">
+      </div>
+      <div class="form-row">
+        <label>訂單狀態</label>
+        <select id="copyOrderStatus" style="width:100%">
+          <option value="pending">待確認</option>
+          <option value="processing">處理中</option>
+          <option value="shipped">已出貨</option>
+        </select>
+      </div>
+      <div class="alert alert-info" style="font-size:12.5px;margin-top:0.5rem">
+        ℹ️ 買家資訊、商品、金額、備註等將完整複製，僅訂單編號和日期可修改。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('copyOrderModal')">取消</button>
+      <button class="btn btn-primary" onclick="confirmCopyOrder()">📋 確認複製</button>
+    </div>
+  </div>
+</div>
+
 <!-- New Order Modal -->
 <div class="modal-overlay" id="newOrderModal">
   <div class="modal" style="width:640px;max-height:92vh;display:flex;flex-direction:column">
@@ -2608,7 +2642,6 @@ function toggleOrdersNav() {
 }
 
 function showOrdersView(view) {
-  selectedOrders.clear();
   _currentOrdersView = view;
   _ordersNavOpen = true;
   document.getElementById('navOrdersParent').classList.add('open');
@@ -2642,31 +2675,10 @@ function showOrdersView(view) {
 function updateNavHoldingAreas() {
   const el = document.getElementById('navHoldingAreaItems');
   if (!el) return;
-  const visibleOrders = orders.filter(o => !o.is_merged_secondary);
-  el.innerHTML = holdingAreas.map(ha => {
-    const count = visibleOrders.filter(o => o.holding_area_id === ha.id).length;
-    return `
-    <div class="nav-subitem" style="padding-left:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:2px;padding-right:4px">
-      <span style="flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" onclick="showHoldingAreaView('${ha.id}')">
-        ${ha.locked ? '🔒 ' : '📌 '}${ha.name}
-        <span style="font-size:10px;opacity:0.6;margin-left:3px">${count}</span>
-      </span>
-      <div style="display:flex;gap:2px;flex-shrink:0">
-        <button onclick="event.stopPropagation();toggleHoldingAreaLock('${ha.id}')"
-          title="${ha.locked ? '點擊解鎖' : '點擊鎖定'}"
-          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:11px;padding:1px 4px;color:${ha.locked ? 'var(--warning)' : 'rgba(255,255,255,0.35)'};line-height:1.4"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)'"
-          onmouseout="this.style.borderColor='transparent'">
-          ${ha.locked ? '🔒' : '🔓'}
-        </button>
-        <button onclick="event.stopPropagation();openHaNavMenu('${ha.id}', this)"
-          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:14px;padding:1px 5px;color:rgba(255,255,255,0.35);line-height:1.4"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.7)'"
-          onmouseout="this.style.borderColor='transparent';this.style.color='rgba(255,255,255,0.35)'"
-          title="更多操作">⋯</button>
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = holdingAreas.map(ha => `
+    <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
+      ${ha.locked ? '🔒 ' : ''}${ha.name}
+    </div>`).join('');
   updateMobileHoldingAreas();
 }
 
@@ -3772,7 +3784,7 @@ function renderOrderPlatTabs() {
   ).join('');
 }
 
-function setOrderPlat(plat) { selectedOrders.clear(); orderFilter.plat = plat; orderFilter.page = 1; renderOrderPlatTabs(); renderOrders(); }
+function setOrderPlat(plat) { orderFilter.plat = plat; orderFilter.page = 1; renderOrderPlatTabs(); renderOrders(); }
 
 function populateOrderVendorFilter() {
   const sel = document.getElementById('orderVendorFilter');
@@ -3878,6 +3890,7 @@ function renderOrders() {
             <button class="btn btn-sm" onclick="openDrawer('${o.id}')" style="margin-right:3px">詳情</button>
             <button class="btn btn-sm" onclick="openEditModal('${o.id}')" style="margin-right:3px">編輯</button>
             <button class="btn btn-sm" onclick="openQuickHoldMenu('${o.id}',this)" style="margin-right:3px;padding:3px 7px" title="移至暫存區">📌</button>
+            <button class="btn btn-sm" onclick="openCopyOrderModal('${o.id}')" style="margin-right:3px;padding:3px 7px" title="複製訂單">📋</button>
             <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">刪除</button>
           </td>
         </tr>`;
@@ -3921,54 +3934,6 @@ function clearOrderSearch() {
   const btn = document.getElementById('orderSearchClearBtn');
   if (btn) btn.style.display = 'none';
   renderOrders();
-}
-
-function selectAllPages() {
-  const q      = (document.getElementById('orderSearch')?.value || '').toLowerCase();
-  const st     = document.getElementById('orderStatusFilter')?.value || '';
-  const vendId = document.getElementById('orderVendorFilter')?.value || '';
-  const haId   = orderFilter.holdingAreaId;
-  const filtered = orders.filter(o => {
-    if (o.is_merged_secondary) return false;
-    if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
-    if (st === '__active__') {
-      if (o.status !== 'pending' && o.status !== 'processing') return false;
-    } else if (st) {
-      if (o.status !== st) return false;
-    }
-    if (haId) {
-      if (haId === '__none__') { if (o.holding_area_id) return false; }
-      else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
-      else { if (o.holding_area_id !== haId) return false; }
-    }
-    if (vendId) {
-      const pids = (o.linked_products||[]).map(l=>l.product_id).concat(o.linked_product_id||'').filter(Boolean);
-      if (!pids.some(pid => products.find(x=>x.id===pid)?.vendor_id===vendId)) return false;
-    }
-    if (q) {
-      const items = getOrderItems(o);
-      const itemMatch = items.some(it =>
-        (it.product_name||'').toLowerCase().includes(q) ||
-        (it.product_spec||'').toLowerCase().includes(q)
-      );
-      if (!(o.order_id||'').toLowerCase().includes(q) &&
-          !(o.buyer_name||'').toLowerCase().includes(q) &&
-          !(o.product_name||'').toLowerCase().includes(q) &&
-          !itemMatch) return false;
-    }
-    const ha = holdingAreas.find(h => h.id === o.holding_area_id);
-    if (ha?.locked) return false;
-    return true;
-  });
-  filtered.forEach(o => selectedOrders.add(o.id));
-  // Update selectAll checkbox state
-  const cb = document.getElementById('selectAll');
-  if (cb) cb.checked = true;
-  updateBatchBar();
-  renderOrders();
-  // Show count in label instead of alert
-  const label = document.getElementById('batchSelLabel');
-  if (label) label.textContent = `已選 ${selectedOrders.size} 筆（全部）`;
 }
 
 function toggleSelectAll(cb) {
@@ -4160,30 +4125,6 @@ function setHoldingAreaFilter(id) {
   renderOrders();
 }
 
-
-function openHaNavMenu(haId, btn) {
-  document.querySelectorAll('.ha-nav-menu').forEach(el => el.remove());
-  const ha = holdingAreas.find(h => h.id === haId);
-  if (!ha) return;
-  const menu = document.createElement('div');
-  menu.className = 'ha-nav-menu';
-  menu.style.cssText = 'position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);min-width:150px;padding:4px 0;font-size:13px;';
-  menu.innerHTML = `
-    <div onclick="openHoldingAreaModal('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">✏️ 編輯暫存區</div>
-    <div onclick="openHoldingAreaModal();document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">➕ 新增暫存區</div>
-    <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-    <div onclick="deleteHoldingArea('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer;color:var(--danger)" onmouseover="this.style.background='var(--danger-light)'" onmouseout="this.style.background=''">🗑 刪除此暫存區</div>`;
-  const rect = btn.getBoundingClientRect();
-  menu.style.top  = (rect.bottom + 4) + 'px';
-  menu.style.left = Math.max(0, rect.right - 160) + 'px';
-  document.body.appendChild(menu);
-  const close = (e) => { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('click', close, true); } };
-  setTimeout(() => document.addEventListener('click', close, true), 10);
-}
-
 async function toggleHoldingAreaLock(id) {
   const ha = holdingAreas.find(h => h.id === id);
   if (!ha) return;
@@ -4326,23 +4267,11 @@ function openBatchHoldModal() {
   document.getElementById('batchHoldModal').classList.add('show');
 }
 
-async function batchRemoveFromHolding() {
-  if (!selectedOrders.size) { alert('請先勾選要移出的訂單'); return; }
-  if (!confirm(`確定將 ${selectedOrders.size} 筆訂單移出暫存區？`)) return;
-  await batchMoveToHoldingArea('');
-}
-
-async function batchMoveToHoldingArea(haId) {
-  const ids = [...selectedOrders];
-  orders = orders.map(o => ids.includes(o.id) ? {...o, holding_area_id: haId} : o);
-  localStorage.setItem('orders', JSON.stringify(orders));
-  for (const id of ids) {
-    const o = orders.find(x => x.id === id);
-    if (o) { try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('batchMove:', e.message); } }
-  }
+function batchMoveToHoldingArea(haId) {
+  orders = orders.map(o => selectedOrders.has(o.id) ? {...o, holding_area_id: haId} : o);
+  saveOrders();
   selectedOrders.clear();
   closeModal('batchHoldModal');
-  updateNavHoldingAreas();
   updateBatchBar(); renderHoldingAreas(); renderOrders();
 }
 
@@ -5254,6 +5183,75 @@ function openEditFromDrawer() {
 // ==================== NEW ORDER (MANUAL) ====================
 let _noItemGroupCounter = 0;
 let _noLinkedCounter = 0;
+
+
+// ==================== COPY ORDER ====================
+let _copySourceOrderId = null;
+
+function openCopyOrderModal(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return;
+  _copySourceOrderId = orderId;
+
+  const items = getOrderItems(o);
+  const itemSummary = items.length > 1
+    ? `${items.length} 項商品`
+    : (o.product_name || '無商品資訊');
+
+  document.getElementById('copyOrderInfo').innerHTML = `
+    <div style="font-weight:700;margin-bottom:4px">${platTag(o.platform)} ${o.order_id}</div>
+    <div style="color:var(--text2)">👤 ${o.buyer_name||'-'} &nbsp;📞 ${o.buyer_phone||'-'}</div>
+    <div style="color:var(--text2);margin-top:2px">🛍 ${itemSummary} &nbsp;💰 $${(o.amount||0).toLocaleString()}</div>
+  `;
+
+  // Default new order id
+  document.getElementById('copyOrderId').value = o.order_id + '-COPY';
+  document.getElementById('copyOrderDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('copyOrderStatus').value = 'pending';
+
+  document.getElementById('copyOrderModal').classList.add('show');
+  setTimeout(() => {
+    const el = document.getElementById('copyOrderId');
+    el.focus(); el.select();
+  }, 100);
+}
+
+async function confirmCopyOrder() {
+  const source = orders.find(x => x.id === _copySourceOrderId);
+  if (!source) return;
+
+  const newOrderId = document.getElementById('copyOrderId').value.trim();
+  if (!newOrderId) { alert('請填寫新的訂單編號'); return; }
+
+  if (orders.some(o => o.order_id === newOrderId && o.platform === source.platform)) {
+    if (!confirm(`平台「${PLATFORMS[source.platform]?.label}」已有訂單編號「${newOrderId}」，確定仍要複製？`)) return;
+  }
+
+  const now = new Date().toISOString();
+  const newOrder = {
+    ...JSON.parse(JSON.stringify(source)), // deep copy
+    id:          'order_' + Date.now(),
+    order_id:    newOrderId,
+    order_date:  document.getElementById('copyOrderDate').value || now.slice(0, 10),
+    status:      document.getElementById('copyOrderStatus').value,
+    created_at:  now,
+    tracking_number: '',
+    is_merged_primary: false,
+    is_merged_secondary: false,
+    merged_from: [],
+    merged_into: '',
+    holding_area_id: '',
+  };
+
+  orders.unshift(newOrder);
+  await saveOrder_DB(newOrder);
+  closeModal('copyOrderModal');
+  renderOrders();
+  renderOrderPlatTabs();
+  renderDashboard();
+  updatePendingBadge();
+  alert(`✅ 訂單「${newOrderId}」已複製成功`);
+}
 
 function openNewOrderModal() {
   const sel = document.getElementById('noPlat');
