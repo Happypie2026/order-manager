@@ -2675,10 +2675,31 @@ function showOrdersView(view) {
 function updateNavHoldingAreas() {
   const el = document.getElementById('navHoldingAreaItems');
   if (!el) return;
-  el.innerHTML = holdingAreas.map(ha => `
-    <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
-      ${ha.locked ? '🔒 ' : ''}${ha.name}
-    </div>`).join('');
+  const visibleOrders = orders.filter(o => !o.is_merged_secondary);
+  el.innerHTML = holdingAreas.map(ha => {
+    const count = visibleOrders.filter(o => o.holding_area_id === ha.id).length;
+    return `
+    <div class="nav-subitem" style="padding-left:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:2px;padding-right:4px">
+      <span style="flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" onclick="showHoldingAreaView('${ha.id}')">
+        ${ha.locked ? '🔒 ' : '📌 '}${ha.name}
+        <span style="font-size:10px;opacity:0.6;margin-left:3px">${count}</span>
+      </span>
+      <div style="display:flex;gap:2px;flex-shrink:0">
+        <button onclick="event.stopPropagation();toggleHoldingAreaLock('${ha.id}')"
+          title="${ha.locked ? '點擊解鎖' : '點擊鎖定'}"
+          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:11px;padding:1px 4px;color:${ha.locked ? 'var(--warning)' : 'rgba(255,255,255,0.35)'};line-height:1.4"
+          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)'"
+          onmouseout="this.style.borderColor='transparent'">
+          ${ha.locked ? '🔒' : '🔓'}
+        </button>
+        <button onclick="event.stopPropagation();openHaNavMenu('${ha.id}', this)"
+          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:14px;padding:1px 5px;color:rgba(255,255,255,0.35);line-height:1.4"
+          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.7)'"
+          onmouseout="this.style.borderColor='transparent';this.style.color='rgba(255,255,255,0.35)'"
+          title="更多操作">⋯</button>
+      </div>
+    </div>`;
+  }).join('');
   updateMobileHoldingAreas();
 }
 
@@ -4123,6 +4144,30 @@ function setHoldingAreaFilter(id) {
   orderFilter.page = 1;
   renderHoldingAreas();
   renderOrders();
+}
+
+
+function openHaNavMenu(haId, btn) {
+  document.querySelectorAll('.ha-nav-menu').forEach(el => el.remove());
+  const ha = holdingAreas.find(h => h.id === haId);
+  if (!ha) return;
+  const menu = document.createElement('div');
+  menu.className = 'ha-nav-menu';
+  menu.style.cssText = 'position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);min-width:150px;padding:4px 0;font-size:13px;';
+  menu.innerHTML = `
+    <div onclick="openHoldingAreaModal('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
+      style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">✏️ 編輯暫存區</div>
+    <div onclick="openHoldingAreaModal();document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
+      style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">➕ 新增暫存區</div>
+    <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+    <div onclick="deleteHoldingArea('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
+      style="padding:8px 14px;cursor:pointer;color:var(--danger)" onmouseover="this.style.background='var(--danger-light)'" onmouseout="this.style.background=''">🗑 刪除此暫存區</div>`;
+  const rect = btn.getBoundingClientRect();
+  menu.style.top  = (rect.bottom + 4) + 'px';
+  menu.style.left = Math.max(0, rect.right - 160) + 'px';
+  document.body.appendChild(menu);
+  const close = (e) => { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('click', close, true); } };
+  setTimeout(() => document.addEventListener('click', close, true), 10);
 }
 
 async function toggleHoldingAreaLock(id) {
