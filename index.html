@@ -1837,42 +1837,6 @@
 <div id="drawerOverlay" onclick="closeDrawer()" style="position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299;display:none"></div>
 
 <!-- Edit Order Modal (kept for table row edit button) -->
-<!-- Copy Order Modal -->
-<div class="modal-overlay" id="copyOrderModal">
-  <div class="modal" style="width:480px">
-    <div class="modal-header">
-      <div class="modal-title">📋 複製訂單</div>
-      <button class="modal-close" onclick="closeModal('copyOrderModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div id="copyOrderInfo" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;font-size:13px"></div>
-      <div class="form-row">
-        <label>新訂單編號 *</label>
-        <input type="text" id="copyOrderId" placeholder="請輸入新的訂單編號">
-      </div>
-      <div class="form-row">
-        <label>下單日期</label>
-        <input type="date" id="copyOrderDate">
-      </div>
-      <div class="form-row">
-        <label>訂單狀態</label>
-        <select id="copyOrderStatus" style="width:100%">
-          <option value="pending">待確認</option>
-          <option value="processing">處理中</option>
-          <option value="shipped">已出貨</option>
-        </select>
-      </div>
-      <div class="alert alert-info" style="font-size:12.5px;margin-top:0.5rem">
-        ℹ️ 買家資訊、商品、金額、備註等將完整複製，僅訂單編號和日期可修改。
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('copyOrderModal')">取消</button>
-      <button class="btn btn-primary" onclick="confirmCopyOrder()">📋 確認複製</button>
-    </div>
-  </div>
-</div>
-
 <!-- New Order Modal -->
 <div class="modal-overlay" id="newOrderModal">
   <div class="modal" style="width:640px;max-height:92vh;display:flex;flex-direction:column">
@@ -2194,7 +2158,7 @@ const PLATFORMS = {
   payeasy: { label: 'PayEasy',   color: '#8e44ad', hint: '後台路徑：PayEasy賣家後台 → 訂單管理 → 匯出訂單' },
   fpg:     { label: '台塑',      color: '#16a085', hint: '後台路徑：台塑購物賣家後台 → 訂單查詢 → 匯出' },
   website: { label: '官網',      color: '#34495e', hint: '官網後台 → 訂單管理 → 訂單列表 → 匯出 CSV ⚠️ 官網格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
-  kangcheng: { label: '康承',    color: '#d35400', hint: '後台路徑：康承賣家後台 → 訂單管理 → 訂單查詢 → 匯出 ⚠️ 康承格式特殊：同一訂單有多列（客戶資料在第一列，商品各自一列），系統匯入時會自動合併' },
+  kangcheng: { label: '康承',    color: '#d35400', hint: '後台路徑：康承賣家後台 → 訂單管理 → 訂單查詢 → 匯出。支援兩種格式：①多列格式（同一訂單多列，客戶資料在第一列）②橫向格式（商品名稱1~4 / 購買數量1~4 在同一列）' },
   mahe:    { label: '瑪黑',      color: '#c0392b', hint: '後台路徑：瑪黑賣家後台 → 訂單管理 → 訂單列表 → 匯出 CSV' },
 };
 
@@ -2211,6 +2175,14 @@ const ALL_FIELDS = [
   { key: 'shipping_detail',    label: '地址',          },  // 誠品專用（街道門牌）
   { key: 'product_name',       label: '商品品名',      },
   { key: 'product_sku',        label: '商品料號',      },
+  { key: 'product_name1',      label: '商品名稱1',     },
+  { key: 'product_qty1',       label: '購買數量1',     },
+  { key: 'product_name2',      label: '商品名稱2',     },
+  { key: 'product_qty2',       label: '購買數量2',     },
+  { key: 'product_name3',      label: '商品名稱3',     },
+  { key: 'product_qty3',       label: '購買數量3',     },
+  { key: 'product_name4',      label: '商品名稱4',     },
+  { key: 'product_qty4',       label: '購買數量4',     },
   { key: 'product_spec',       label: '商品規格',      },
   { key: 'product_qty',        label: '商品數量',      },
   { key: 'shipping_interval',  label: '出貨區間',      },
@@ -2271,6 +2243,8 @@ function getFieldsForPlatform(platId) {
     ...(useSplitAddr ? ['shipping_city','shipping_district','shipping_detail'] : ['shipping_address']),
     'product_name',
     'product_sku',
+    // 康承橫向格式：商品名稱1~4 / 購買數量1~4
+    ...(platId === 'kangcheng' ? ['product_name1','product_qty1','product_name2','product_qty2','product_name3','product_qty3','product_name4','product_qty4'] : []),
     // 康承、官網不需要商品規格欄位（格式已含在商品名稱內）
     ...(platId === 'kangcheng' || platId === 'website' ? [] : ['product_spec']),
     'product_qty',
@@ -2675,31 +2649,10 @@ function showOrdersView(view) {
 function updateNavHoldingAreas() {
   const el = document.getElementById('navHoldingAreaItems');
   if (!el) return;
-  const visibleOrders = orders.filter(o => !o.is_merged_secondary);
-  el.innerHTML = holdingAreas.map(ha => {
-    const count = visibleOrders.filter(o => o.holding_area_id === ha.id).length;
-    return `
-    <div class="nav-subitem" style="padding-left:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:2px;padding-right:4px">
-      <span style="flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" onclick="showHoldingAreaView('${ha.id}')">
-        ${ha.locked ? '🔒 ' : '📌 '}${ha.name}
-        <span style="font-size:10px;opacity:0.6;margin-left:3px">${count}</span>
-      </span>
-      <div style="display:flex;gap:2px;flex-shrink:0">
-        <button onclick="event.stopPropagation();toggleHoldingAreaLock('${ha.id}')"
-          title="${ha.locked ? '點擊解鎖' : '點擊鎖定'}"
-          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:11px;padding:1px 4px;color:${ha.locked ? 'var(--warning)' : 'rgba(255,255,255,0.35)'};line-height:1.4"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)'"
-          onmouseout="this.style.borderColor='transparent'">
-          ${ha.locked ? '🔒' : '🔓'}
-        </button>
-        <button onclick="event.stopPropagation();openHaNavMenu('${ha.id}', this)"
-          style="background:none;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:14px;padding:1px 5px;color:rgba(255,255,255,0.35);line-height:1.4"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.7)'"
-          onmouseout="this.style.borderColor='transparent';this.style.color='rgba(255,255,255,0.35)'"
-          title="更多操作">⋯</button>
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = holdingAreas.map(ha => `
+    <div class="nav-subitem" style="padding-left:3rem" onclick="showHoldingAreaView('${ha.id}')">
+      ${ha.locked ? '🔒 ' : ''}${ha.name}
+    </div>`).join('');
   updateMobileHoldingAreas();
 }
 
@@ -3325,6 +3278,14 @@ function guessColumn(key, headers) {
     amount:                ['訂單金額','買家實付金額','訂單總金額','總金額','金額','amount','發票金額','折扣前總金額'],
     product_name:          ['商品名稱','品名','商品品名','商品','product_name','item_name','品項名稱'],
     product_sku:           ['商品料號','料號','SKU','sku','商品編號','貨號','item_sku','product_code'],
+    product_name1:         ['商品名稱1','品名1','item1'],
+    product_qty1:          ['購買數量1','數量1','qty1'],
+    product_name2:         ['商品名稱2','品名2','item2'],
+    product_qty2:          ['購買數量2','數量2','qty2'],
+    product_name3:         ['商品名稱3','品名3','item3'],
+    product_qty3:          ['購買數量3','數量3','qty3'],
+    product_name4:         ['商品名稱4','品名4','item4'],
+    product_qty4:          ['購買數量4','數量4','qty4'],
     product_spec:          ['商品規格','規格','顏色尺寸','款式','spec','variation','商品屬性','sku'],
     product_qty:           ['數量','購買數量','商品數量','qty','quantity','件數'],
     customer_note:         ['買家備註','客戶備註','配送備註','備註','訂單備註','note','remark','留言','客戶配送需求'],
@@ -3388,24 +3349,43 @@ function doImport() {
   if (MULTI_ROW_PLATFORMS.has(importState.platform)) {
     const m = importState.mapping;
     const merged = [];
-    let lastOrderRow = null;
 
-    importState.csvData.forEach(row => {
-      const orderId = m.order_id ? String(row[m.order_id] || '').trim() : '';
-      const pName   = m.product_name ? String(row[m.product_name] || '').trim() : '';
-      const pQty    = m.product_qty  ? String(row[m.product_qty]  || '').trim() : '';
+    // Detect if this is horizontal format (商品名稱1~4 / 購買數量1~4)
+    const isHorizontal = !!(m.product_name1 || m.product_name2 || m.product_name3 || m.product_name4);
 
-      if (orderId) {
-        // New order row — start a new group
-        lastOrderRow = { ...row, _items: [] };
-        if (pName) lastOrderRow._items.push({ name: pName, qty: pQty });
-        merged.push(lastOrderRow);
-      } else if (lastOrderRow && pName) {
-        // Continuation row — append item to last order
-        lastOrderRow._items.push({ name: pName, qty: pQty });
-      }
-      // rows with no order_id and no product → skip
-    });
+    if (isHorizontal) {
+      // Horizontal format: each row = one order, with up to 4 products in columns
+      importState.csvData.forEach(row => {
+        const orderId = m.order_id ? String(row[m.order_id] || '').trim() : '';
+        if (!orderId) return;
+        const items = [];
+        for (let i = 1; i <= 4; i++) {
+          const nameKey = m[`product_name${i}`];
+          const qtyKey  = m[`product_qty${i}`];
+          const name = nameKey ? String(row[nameKey] || '').trim() : '';
+          const qty  = qtyKey  ? String(row[qtyKey]  || '').trim() : '';
+          if (name && name !== 'NaN' && name !== 'nan') {
+            items.push({ name, qty: qty && qty !== 'NaN' ? qty : '1' });
+          }
+        }
+        merged.push({ ...row, _items: items });
+      });
+    } else {
+      // Original multi-row format: same order split across multiple rows
+      let lastOrderRow = null;
+      importState.csvData.forEach(row => {
+        const orderId = m.order_id ? String(row[m.order_id] || '').trim() : '';
+        const pName   = m.product_name ? String(row[m.product_name] || '').trim() : '';
+        const pQty    = m.product_qty  ? String(row[m.product_qty]  || '').trim() : '';
+        if (orderId) {
+          lastOrderRow = { ...row, _items: [] };
+          if (pName) lastOrderRow._items.push({ name: pName, qty: pQty });
+          merged.push(lastOrderRow);
+        } else if (lastOrderRow && pName) {
+          lastOrderRow._items.push({ name: pName, qty: pQty });
+        }
+      });
+    }
     processedRows = merged;
   }
   // ───────────────────────────────────────────────────────────────────
@@ -3911,7 +3891,6 @@ function renderOrders() {
             <button class="btn btn-sm" onclick="openDrawer('${o.id}')" style="margin-right:3px">詳情</button>
             <button class="btn btn-sm" onclick="openEditModal('${o.id}')" style="margin-right:3px">編輯</button>
             <button class="btn btn-sm" onclick="openQuickHoldMenu('${o.id}',this)" style="margin-right:3px;padding:3px 7px" title="移至暫存區">📌</button>
-            <button class="btn btn-sm" onclick="openCopyOrderModal('${o.id}')" style="margin-right:3px;padding:3px 7px" title="複製訂單">📋</button>
             <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">刪除</button>
           </td>
         </tr>`;
@@ -4144,30 +4123,6 @@ function setHoldingAreaFilter(id) {
   orderFilter.page = 1;
   renderHoldingAreas();
   renderOrders();
-}
-
-
-function openHaNavMenu(haId, btn) {
-  document.querySelectorAll('.ha-nav-menu').forEach(el => el.remove());
-  const ha = holdingAreas.find(h => h.id === haId);
-  if (!ha) return;
-  const menu = document.createElement('div');
-  menu.className = 'ha-nav-menu';
-  menu.style.cssText = 'position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);min-width:150px;padding:4px 0;font-size:13px;';
-  menu.innerHTML = `
-    <div onclick="openHoldingAreaModal('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">✏️ 編輯暫存區</div>
-    <div onclick="openHoldingAreaModal();document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">➕ 新增暫存區</div>
-    <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-    <div onclick="deleteHoldingArea('${haId}');document.querySelectorAll('.ha-nav-menu').forEach(e=>e.remove())"
-      style="padding:8px 14px;cursor:pointer;color:var(--danger)" onmouseover="this.style.background='var(--danger-light)'" onmouseout="this.style.background=''">🗑 刪除此暫存區</div>`;
-  const rect = btn.getBoundingClientRect();
-  menu.style.top  = (rect.bottom + 4) + 'px';
-  menu.style.left = Math.max(0, rect.right - 160) + 'px';
-  document.body.appendChild(menu);
-  const close = (e) => { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('click', close, true); } };
-  setTimeout(() => document.addEventListener('click', close, true), 10);
 }
 
 async function toggleHoldingAreaLock(id) {
@@ -5214,14 +5169,7 @@ async function saveDrawerEdit() {
                                   product_qty: primary?.qty || orders[idx].product_qty } : {}),
   };
 
-  localStorage.setItem('orders', JSON.stringify(orders));
-  try {
-    await SB.upsert('orders', toDbOrder(orders[idx]));
-  } catch(e) {
-    console.error('saveDrawerEdit failed:', e.message);
-    alert('⚠️ 儲存失敗：' + e.message);
-    return;
-  }
+  saveOrders();
   setDrawerEditMode(false);
   openDrawer(id);
   renderOrders(); updatePendingBadge(); renderDashboard();
@@ -5235,75 +5183,6 @@ function openEditFromDrawer() {
 // ==================== NEW ORDER (MANUAL) ====================
 let _noItemGroupCounter = 0;
 let _noLinkedCounter = 0;
-
-
-// ==================== COPY ORDER ====================
-let _copySourceOrderId = null;
-
-function openCopyOrderModal(orderId) {
-  const o = orders.find(x => x.id === orderId);
-  if (!o) return;
-  _copySourceOrderId = orderId;
-
-  const items = getOrderItems(o);
-  const itemSummary = items.length > 1
-    ? `${items.length} 項商品`
-    : (o.product_name || '無商品資訊');
-
-  document.getElementById('copyOrderInfo').innerHTML = `
-    <div style="font-weight:700;margin-bottom:4px">${platTag(o.platform)} ${o.order_id}</div>
-    <div style="color:var(--text2)">👤 ${o.buyer_name||'-'} &nbsp;📞 ${o.buyer_phone||'-'}</div>
-    <div style="color:var(--text2);margin-top:2px">🛍 ${itemSummary} &nbsp;💰 $${(o.amount||0).toLocaleString()}</div>
-  `;
-
-  // Default new order id
-  document.getElementById('copyOrderId').value = o.order_id + '-COPY';
-  document.getElementById('copyOrderDate').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('copyOrderStatus').value = 'pending';
-
-  document.getElementById('copyOrderModal').classList.add('show');
-  setTimeout(() => {
-    const el = document.getElementById('copyOrderId');
-    el.focus(); el.select();
-  }, 100);
-}
-
-async function confirmCopyOrder() {
-  const source = orders.find(x => x.id === _copySourceOrderId);
-  if (!source) return;
-
-  const newOrderId = document.getElementById('copyOrderId').value.trim();
-  if (!newOrderId) { alert('請填寫新的訂單編號'); return; }
-
-  if (orders.some(o => o.order_id === newOrderId && o.platform === source.platform)) {
-    if (!confirm(`平台「${PLATFORMS[source.platform]?.label}」已有訂單編號「${newOrderId}」，確定仍要複製？`)) return;
-  }
-
-  const now = new Date().toISOString();
-  const newOrder = {
-    ...JSON.parse(JSON.stringify(source)), // deep copy
-    id:          'order_' + Date.now(),
-    order_id:    newOrderId,
-    order_date:  document.getElementById('copyOrderDate').value || now.slice(0, 10),
-    status:      document.getElementById('copyOrderStatus').value,
-    created_at:  now,
-    tracking_number: '',
-    is_merged_primary: false,
-    is_merged_secondary: false,
-    merged_from: [],
-    merged_into: '',
-    holding_area_id: '',
-  };
-
-  orders.unshift(newOrder);
-  await saveOrder_DB(newOrder);
-  closeModal('copyOrderModal');
-  renderOrders();
-  renderOrderPlatTabs();
-  renderDashboard();
-  updatePendingBadge();
-  alert(`✅ 訂單「${newOrderId}」已複製成功`);
-}
 
 function openNewOrderModal() {
   const sel = document.getElementById('noPlat');
@@ -5488,12 +5367,7 @@ async function saveOrder() {
 
 async function saveOrder_DB(o) {
   localStorage.setItem('orders', JSON.stringify(orders));
-  try {
-    await SB.upsert('orders', toDbOrder(o));
-  } catch(e) {
-    console.error('saveOrder_DB failed:', e.message);
-    alert('⚠️ 訂單儲存失敗，重整後資料可能消失。\n錯誤：' + e.message);
-  }
+  try { await SB.upsert('orders', o); } catch(e) { console.warn('saveOrder_DB:', e.message); }
 }
 
 function exportCSV() {
