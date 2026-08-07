@@ -2241,13 +2241,13 @@ function getFieldsForPlatform(platId) {
     ...(useSplitPhone ? ['buyer_phone_landline','buyer_phone_mobile'] : ['buyer_phone']),
     // Address: single or split
     ...(useSplitAddr ? ['shipping_city','shipping_district','shipping_detail'] : ['shipping_address']),
-    'product_name',
-    'product_sku',
+    // 康承不顯示商品品名、料號、數量（用橫向格式 商品名稱1~4 取代）
+    ...(platId === 'kangcheng' ? [] : ['product_name', 'product_sku']),
     // 康承橫向格式：商品名稱1~4 / 購買數量1~4
     ...(platId === 'kangcheng' ? ['product_name1','product_qty1','product_name2','product_qty2','product_name3','product_qty3','product_name4','product_qty4'] : []),
     // 康承、官網不需要商品規格欄位（格式已含在商品名稱內）
     ...(platId === 'kangcheng' || platId === 'website' ? [] : ['product_spec']),
-    'product_qty',
+    ...(platId === 'kangcheng' ? [] : ['product_qty']),
     // Platform-specific extras (shipping_interval for fresh)
     ...extraKeys.filter(k => !['shipping_city','shipping_district','shipping_detail','buyer_phone_landline','buyer_phone_mobile'].includes(k)),
     'customer_note','vendor_note','amount','status','order_date',
