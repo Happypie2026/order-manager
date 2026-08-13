@@ -3382,7 +3382,7 @@ function updateMapping(key, val) {
   }
 }
 
-function doImport() {
+async function doImport() {
   // Validate required fields
   const missing = SYSTEM_FIELDS_FOR(importState.platform).filter(f => f.required && !importState.mapping[f.key]);
   if (missing.length) { alert('請設定必填欄位：' + missing.map(f => f.label).join('、')); return; }
@@ -4783,7 +4783,7 @@ function getOrderItems(o) {
   return [];
 }
 
-function confirmMerge() {
+async function confirmMerge() {
   if (!_mergeSelectedPrimary) { alert('請選擇主訂單'); return; }
   const ids = _mergePickedIds.size >= 2 ? [..._mergePickedIds] : [...selectedOrders];
   if (ids.length < 2) { alert('請至少選取 2 筆訂單'); return; }
