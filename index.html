@@ -3549,7 +3549,12 @@ function doImport() {
     added++;
   });
 
-  saveOrders();
+  // Save newly imported orders individually
+  localStorage.setItem('orders', JSON.stringify(orders));
+  const newOrders = orders.slice(0, added);
+  for (const o of newOrders) {
+    try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('importSave:', e.message); }
+  }
   importState._added = added;
   importState._skipped = skipped;
   updatePendingBadge();
@@ -3760,7 +3765,7 @@ function saveProductMappingAndFinish() {
     }
     return o;
   });
-  saveOrders();
+  localStorage.setItem('orders', JSON.stringify(orders));
   finishImport();
 }
 
@@ -4247,9 +4252,13 @@ async function deleteHoldingArea(id) {
   const ha = holdingAreas.find(x=>x.id===id);
   const count = orders.filter(o=>o.holding_area_id===id).length;
   if (!confirm(`確定刪除暫存區「${ha?.name}」？${count?`（${count} 筆訂單將移回未分類）`:''}此操作無法復原。`)) return;
+  const affected = orders.filter(o => o.holding_area_id===id).map(o => ({...o, holding_area_id:''}));
   orders = orders.map(o => o.holding_area_id===id ? {...o, holding_area_id:''} : o);
   await deleteHoldingAreaFromDB(id);
-  await saveOrders();
+  localStorage.setItem('orders', JSON.stringify(orders));
+  for (const o of affected) {
+    try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('deleteHA order:', e.message); }
+  }
   if (orderFilter.holdingAreaId===id) orderFilter.holdingAreaId='';
   renderHoldingAreas(); renderOrders();
 }
@@ -4349,11 +4358,17 @@ function openBatchHoldModal() {
   document.getElementById('batchHoldModal').classList.add('show');
 }
 
-function batchMoveToHoldingArea(haId) {
-  orders = orders.map(o => selectedOrders.has(o.id) ? {...o, holding_area_id: haId} : o);
-  saveOrders();
+async function batchMoveToHoldingArea(haId) {
+  const ids = [...selectedOrders];
+  orders = orders.map(o => ids.includes(o.id) ? {...o, holding_area_id: haId} : o);
+  localStorage.setItem('orders', JSON.stringify(orders));
+  for (const id of ids) {
+    const o = orders.find(x => x.id === id);
+    if (o) { try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('batchMove:', e.message); } }
+  }
   selectedOrders.clear();
   closeModal('batchHoldModal');
+  updateNavHoldingAreas();
   updateBatchBar(); renderHoldingAreas(); renderOrders();
 }
 
@@ -4815,7 +4830,12 @@ function confirmMerge() {
     return o;
   });
 
-  saveOrders();
+  // Save merged order individually
+  const mergedO = orders.find(o => o.id === _mergeSelectedPrimary);
+  if (mergedO) {
+    localStorage.setItem('orders', JSON.stringify(orders));
+    try { await SB.upsert('orders', toDbOrder(mergedO)); } catch(e) { console.warn('mergeSave:', e.message); }
+  }
   closeModal('mergeModal');
   selectedOrders.clear();
   updateBatchBar();
@@ -5251,7 +5271,13 @@ async function saveDrawerEdit() {
                                   product_qty: primary?.qty || orders[idx].product_qty } : {}),
   };
 
-  saveOrders();
+  localStorage.setItem('orders', JSON.stringify(orders));
+  try {
+    await SB.upsert('orders', toDbOrder(orders[idx]));
+  } catch(e) {
+    alert('⚠️ 儲存失敗：' + e.message);
+    return;
+  }
   setDrawerEditMode(false);
   openDrawer(id);
   renderOrders(); updatePendingBadge(); renderDashboard();
@@ -5500,7 +5526,7 @@ async function saveOrder() {
 
 async function saveOrder_DB(o) {
   localStorage.setItem('orders', JSON.stringify(orders));
-  try { await SB.upsert('orders', o); } catch(e) { console.warn('saveOrder_DB:', e.message); }
+  try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('saveOrder_DB:', e.message); }
 }
 
 function exportCSV() {
