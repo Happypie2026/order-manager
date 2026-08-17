@@ -7314,7 +7314,7 @@ function exportReport() {
 let _colMappingSelected = new Set();
 
 function renderMappingCards() {
-  const platforms = Object.keys(PLATFORMS).filter(k => mappings[k]); // only show platforms with mappings
+  const platforms = Object.keys(PLATFORMS).filter(k => mappings[k]);
   const unset = Object.keys(PLATFORMS).filter(k => !mappings[k]);
 
   document.getElementById('mappingCards').innerHTML =
@@ -7322,6 +7322,20 @@ function renderMappingCards() {
     platforms.map(k => {
       const m = mappings[k];
       const checked = _colMappingSelected.has(k);
+      const fields = SYSTEM_FIELDS_FOR(k);
+      const rows = fields.map(f => `
+        <tr>
+          <td style="font-size:12.5px;white-space:nowrap;width:140px">
+            ${f.label}${f.required ? '<span style="color:var(--danger);margin-left:3px">*</span>' : ''}
+          </td>
+          <td>
+            <input type="text"
+              value="${(m[f.key]||'').replace(/"/g,'&quot;')}"
+              placeholder="CSV欄位名稱（留空=不對應）"
+              oninput="updateMappingField('${k}','${f.key}',this.value)"
+              style="width:100%;font-size:12.5px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface)">
+          </td>
+        </tr>`).join('');
       return `<div class="card card-pad mb-2" id="colCard_${k}" style="border:2px solid ${checked ? 'var(--accent-mid)' : 'var(--border)'}">
         <div class="card-title flex justify-between items-center">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1">
@@ -7330,14 +7344,44 @@ function renderMappingCards() {
             <span>${platTag(k)} 欄位對應</span>
             <span class="tag tag-new">已設定</span>
           </label>
-          <button class="btn btn-sm btn-danger" onclick="clearMapping('${k}')">清除</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary" onclick="saveMappingCard('${k}')">💾 儲存</button>
+            <button class="btn btn-sm btn-danger" onclick="clearMapping('${k}')">清除</button>
+          </div>
         </div>
-        <div class="table-wrap" style="border:none;border-radius:0"><table style="font-size:12.5px"><thead><tr><th>系統欄位</th><th>對應CSV欄位</th></tr></thead><tbody>${SYSTEM_FIELDS_FOR(k).filter(f=>m[f.key]).map(f=>`<tr><td>${f.label}${f.required?'<span style="color:var(--danger);margin-left:3px">*</span>':''}</td><td class="mono">${m[f.key]||'-'}</td></tr>`).join('')}</tbody></table></div>
+        <div class="table-wrap" style="border:none;border-radius:0">
+          <table style="font-size:12.5px">
+            <thead><tr><th style="width:140px">系統欄位</th><th>對應CSV欄位</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
       </div>`;
     }).join('') +
     (unset.length ? `<div style="margin-top:1rem;font-size:12px;color:var(--text3)">尚未設定：${unset.map(k=>PLATFORMS[k].label).join('、')}（首次匯入時會要求設定）</div>` : '');
 
   updateColMappingBar();
+}
+
+function updateMappingField(plat, key, val) {
+  if (!mappings[plat]) mappings[plat] = {};
+  if (val.trim()) {
+    mappings[plat][key] = val.trim();
+  } else {
+    delete mappings[plat][key];
+  }
+}
+
+async function saveMappingCard(plat) {
+  if (!mappings[plat]) return;
+  localStorage.setItem('mappings', JSON.stringify(mappings));
+  try {
+    await SB.upsert('mappings', { platform: plat, mapping: mappings[plat] });
+    // Show brief success indication
+    const btn = document.querySelector(`#colCard_${plat} .btn-primary`);
+    if (btn) { btn.textContent = '✅ 已儲存'; setTimeout(() => { btn.textContent = '💾 儲存'; }, 1500); }
+  } catch(e) {
+    alert('⚠️ 儲存失敗：' + e.message);
+  }
 }
 
 function toggleColMappingSelect(plat, checked) {
