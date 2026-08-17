@@ -737,7 +737,7 @@
           <div class="filters" style="margin-bottom:8px">
             <div class="search-wrap" style="min-width:180px;flex:1;position:relative">
               <span class="search-icon">🔍</span>
-              <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="renderOrders();toggleOrderSearchClear()" onkeydown="if(event.key==='Enter')renderOrders()">
+              <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="selectedOrders.clear();renderOrders();toggleOrderSearchClear()" onkeydown="if(event.key==='Enter')renderOrders()">
               <button id="orderSearchClearBtn" onclick="clearOrderSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);line-height:1;padding:0" title="清除搜尋">×</button>
             </div>
             <select id="orderStatusFilter" onchange="selectedOrders.clear();renderOrders()">
@@ -749,10 +749,10 @@
               <option value="delivered">已送達</option>
               <option value="cancelled">已取消</option>
             </select>
-            <select id="orderVendorFilter" onchange="renderOrders()">
+            <select id="orderVendorFilter" onchange="selectedOrders.clear();renderOrders()">
               <option value="">全部廠商</option>
             </select>
-            <select id="orderSort" onchange="renderOrders()">
+            <select id="orderSort" onchange="selectedOrders.clear();renderOrders()">
               <option value="date_desc">最新優先</option>
               <option value="date_asc">最舊優先</option>
               <option value="amount_desc">金額高→低</option>
@@ -4108,9 +4108,8 @@ function updateBatchBar() {
   const label = document.getElementById('batchSelLabel');
   const count = document.getElementById('batchCount');
   const cb = document.getElementById('selectAll');
-  if (n === 0 && cb) cb.checked = false;
-  if (label && !label.textContent.includes('全部')) label.textContent = n > 0 ? `已選 ${n} 筆` : '全選此頁';
-  if (n === 0 && label) label.textContent = '全選此頁';
+  if (cb) cb.checked = n > 0;
+  if (label) label.textContent = n > 0 ? `已選 ${n} 筆` : '全選';
   if (count) count.textContent = n > 0 ? `共選取 ${n} 筆訂單` : '尚未選取任何訂單';
   const bar = document.getElementById('batchBar');
   if (bar) {
