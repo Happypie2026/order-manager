@@ -758,6 +758,12 @@
               <option value="amount_desc">金額高→低</option>
             </select>
             <button class="btn" onclick="refreshOrdersFromDB()" style="white-space:nowrap;flex-shrink:0">🔄 同步更新</button>
+            <select id="perPageSel" onchange="PER_PAGE=+this.value;orderFilter.page=1;renderOrders()" style="font-size:12px;padding:4px 6px;flex-shrink:0">
+              <option value="100">每頁 100</option>
+              <option value="200" selected>每頁 200</option>
+              <option value="500">每頁 500</option>
+              <option value="1000">每頁 1000</option>
+            </select>
             <button class="btn" onclick="openSmartMergeModal()" style="white-space:nowrap;flex-shrink:0;background:var(--info-light);color:var(--info);border-color:#b8d0ec;font-weight:500">🔍 篩選重複合併</button>
           </div>
 
@@ -766,6 +772,7 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
               <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="accent-color:var(--accent)">
               <span id="batchSelLabel" style="color:var(--text2)">全選此頁</span>
+              <button class="btn btn-sm" onclick="selectAllPages()" style="font-size:11px;padding:2px 8px;margin-left:4px">全選所有頁</button>
             </label>
             <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
             <span id="batchCount" style="font-size:12.5px;color:var(--text3)">尚未選取</span>
@@ -2323,7 +2330,7 @@ let importState = { platform: 'momo', csvHeaders: [], csvData: [], mapping: {} }
 let orderFilter = { plat: 'all', status: '', search: '', sort: 'date_desc', page: 1, vendorId: '', holdingAreaId: '' };
 let selectedOrders = new Set();
 
-const PER_PAGE = 100;
+let PER_PAGE = 200;
 
 // ==================== INIT ====================
 // ==================== AUTH / LOGIN (Supabase) ====================
@@ -3999,6 +4006,53 @@ function clearOrderSearch() {
   renderOrders();
 }
 
+function selectAllPages() {
+  const q      = (document.getElementById('orderSearch')?.value || '').toLowerCase();
+  const st     = document.getElementById('orderStatusFilter')?.value || '';
+  const vendId = document.getElementById('orderVendorFilter')?.value || '';
+  const haId   = orderFilter.holdingAreaId;
+  const filtered = orders.filter(o => {
+    if (o.is_merged_secondary) return false;
+    if (orderFilter.plat !== 'all' && o.platform !== orderFilter.plat) return false;
+    if (st === '__active__') {
+      if (o.status !== 'pending' && o.status !== 'processing') return false;
+    } else if (st) {
+      if (o.status !== st) return false;
+    }
+    if (haId) {
+      if (haId === '__none__') { if (o.holding_area_id) return false; }
+      else if (haId === '__has_holding__') { if (!o.holding_area_id) return false; }
+      else { if (o.holding_area_id !== haId) return false; }
+    }
+    if (vendId) {
+      const pids = (o.linked_products||[]).map(l=>l.product_id).concat(o.linked_product_id||'').filter(Boolean);
+      if (!pids.some(pid => products.find(x=>x.id===pid)?.vendor_id===vendId)) return false;
+    }
+    if (q) {
+      const items = getOrderItems(o);
+      const itemMatch = items.some(it =>
+        (it.product_name||'').toLowerCase().includes(q) ||
+        (it.product_spec||'').toLowerCase().includes(q)
+      );
+      if (!(o.order_id||'').toLowerCase().includes(q) &&
+          !(o.buyer_name||'').toLowerCase().includes(q) &&
+          !(o.product_name||'').toLowerCase().includes(q) &&
+          !(o.merged_from||[]).some(id => id.toLowerCase().includes(q)) &&
+          !itemMatch) return false;
+    }
+    const ha = holdingAreas.find(h => h.id === o.holding_area_id);
+    if (ha?.locked) return false;
+    return true;
+  });
+  filtered.forEach(o => selectedOrders.add(o.id));
+  const cb = document.getElementById('selectAll');
+  if (cb) cb.checked = true;
+  updateBatchBar();
+  renderOrders();
+  const label = document.getElementById('batchSelLabel');
+  if (label) label.textContent = `已選 ${selectedOrders.size} 筆（全部）`;
+}
+
 function toggleSelectAll(cb) {
   const q      = (document.getElementById('orderSearch')?.value || '').toLowerCase();
   const st     = document.getElementById('orderStatusFilter')?.value || '';
@@ -4049,7 +4103,10 @@ function updateBatchBar() {
   const n = selectedOrders.size;
   const label = document.getElementById('batchSelLabel');
   const count = document.getElementById('batchCount');
-  if (label) label.textContent = n > 0 ? `已選 ${n} 筆` : '全選此頁';
+  const cb = document.getElementById('selectAll');
+  if (n === 0 && cb) cb.checked = false;
+  if (label && !label.textContent.includes('全部')) label.textContent = n > 0 ? `已選 ${n} 筆` : '全選此頁';
+  if (n === 0 && label) label.textContent = '全選此頁';
   if (count) count.textContent = n > 0 ? `共選取 ${n} 筆訂單` : '尚未選取任何訂單';
   const bar = document.getElementById('batchBar');
   if (bar) {
@@ -4093,7 +4150,12 @@ async function applyBatchStatus() {
   if (failed > 0) alert(`⚠️ 有 ${failed} 筆訂單狀態未能同步到 Supabase，請再試一次。`);
 
   if (sel) sel.value = '';
-  selectedOrders.clear(); updateBatchBar(); renderOrders(); updatePendingBadge(); renderDashboard();
+  selectedOrders.clear();
+  const cb = document.getElementById('selectAll');
+  if (cb) cb.checked = false;
+  const label = document.getElementById('batchSelLabel');
+  if (label) label.textContent = '全選此頁';
+  updateBatchBar(); renderOrders(); updatePendingBadge(); renderDashboard();
 }
 
 async function bulkUpdateStatus(status) {
@@ -5280,6 +5342,13 @@ async function saveDrawerEdit() {
   }
   setDrawerEditMode(false);
   openDrawer(id);
+  // Reset selection state after edit
+  selectedOrders.clear();
+  const cb = document.getElementById('selectAll');
+  if (cb) cb.checked = false;
+  const label = document.getElementById('batchSelLabel');
+  if (label) label.textContent = '全選此頁';
+  updateBatchBar();
   renderOrders(); updatePendingBadge(); renderDashboard();
 }
 
