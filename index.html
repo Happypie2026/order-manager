@@ -740,7 +740,7 @@
               <input type="text" id="orderSearch" placeholder="訂單編號、買家姓名、商品關鍵字…" oninput="renderOrders();toggleOrderSearchClear()" onkeydown="if(event.key==='Enter')renderOrders()">
               <button id="orderSearchClearBtn" onclick="clearOrderSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);line-height:1;padding:0" title="清除搜尋">×</button>
             </div>
-            <select id="orderStatusFilter" onchange="renderOrders()">
+            <select id="orderStatusFilter" onchange="selectedOrders.clear();renderOrders()">
               <option value="__active__">待確認 ＋ 處理中</option>
               <option value="">全部狀態</option>
               <option value="pending">待確認</option>
@@ -771,8 +771,7 @@
           <div id="batchBar" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
               <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="accent-color:var(--accent)">
-              <span id="batchSelLabel" style="color:var(--text2)">全選此頁</span>
-              <button class="btn btn-sm" onclick="selectAllPages()" style="font-size:11px;padding:2px 8px;margin-left:4px">全選所有頁</button>
+              <span id="batchSelLabel" style="color:var(--text2)">全選</span>
             </label>
             <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
             <span id="batchCount" style="font-size:12.5px;color:var(--text3)">尚未選取</span>
@@ -2659,6 +2658,7 @@ function toggleOrdersNav() {
 }
 
 function showOrdersView(view) {
+  selectedOrders.clear();
   _currentOrdersView = view;
   _ordersNavOpen = true;
   document.getElementById('navOrdersParent').classList.add('open');
@@ -2721,6 +2721,7 @@ function updateNavHoldingAreas() {
 }
 
 function showHoldingAreaView(haId) {
+  selectedOrders.clear();
   _currentOrdersView = 'holding';
   ['active','shipped','cancelled','holding'].forEach(v =>
     document.getElementById(`subOrders-${v}`)?.classList.toggle('active', v === 'holding'));
@@ -3854,7 +3855,7 @@ function renderOrderPlatTabs() {
   ).join('');
 }
 
-function setOrderPlat(plat) { orderFilter.plat = plat; orderFilter.page = 1; renderOrderPlatTabs(); renderOrders(); }
+function setOrderPlat(plat) { selectedOrders.clear(); orderFilter.plat = plat; orderFilter.page = 1; renderOrderPlatTabs(); renderOrders(); }
 
 function populateOrderVendorFilter() {
   const sel = document.getElementById('orderVendorFilter');
@@ -4092,9 +4093,12 @@ function toggleSelectAll(cb) {
     if (ha?.locked && cb.checked) return false;
     return true;
   });
-  const slice = filtered.slice((orderFilter.page - 1) * PER_PAGE, orderFilter.page * PER_PAGE);
-  if (cb.checked) slice.forEach(o => selectedOrders.add(o.id));
-  else filtered.forEach(o => selectedOrders.delete(o.id));
+  if (cb.checked) {
+    // Select ALL pages
+    filtered.forEach(o => selectedOrders.add(o.id));
+  } else {
+    filtered.forEach(o => selectedOrders.delete(o.id));
+  }
   updateBatchBar();
   renderOrders();
 }
