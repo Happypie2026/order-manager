@@ -3746,7 +3746,7 @@ function autoGuessProduct(name, spec) {
   return match?.id || '';
 }
 
-function saveProductMappingAndFinish() {
+async function saveProductMappingAndFinish() {
   const combos = importState._pendingCombos || [];
   combos.forEach((c, i) => {
     const items = getPmItemsForCard(i).filter(x => x.product_id);
@@ -3774,6 +3774,10 @@ function saveProductMappingAndFinish() {
     return o;
   });
   localStorage.setItem('orders', JSON.stringify(orders));
+  // Save newly imported orders to Supabase
+  for (const o of orders.slice(0, added)) {
+    try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('multiRowSave:', e.message); }
+  }
   finishImport();
 }
 
@@ -4895,11 +4899,16 @@ async function confirmMerge() {
     return o;
   });
 
-  // Save merged order individually
+  // Save merged order and secondary orders to Supabase
+  localStorage.setItem('orders', JSON.stringify(orders));
   const mergedO = orders.find(o => o.id === _mergeSelectedPrimary);
   if (mergedO) {
-    localStorage.setItem('orders', JSON.stringify(orders));
-    try { await SB.upsert('orders', toDbOrder(mergedO)); } catch(e) { console.warn('mergeSave:', e.message); }
+    try { await SB.upsert('orders', toDbOrder(mergedO)); } catch(e) { console.warn('mergeSave primary:', e.message); }
+  }
+  // Also save secondary orders (marked as merged)
+  for (const id of mergedIds) {
+    const sec = orders.find(o => o.id === id);
+    if (sec) { try { await SB.upsert('orders', toDbOrder(sec)); } catch(e) { console.warn('mergeSave secondary:', e.message); } }
   }
   closeModal('mergeModal');
   selectedOrders.clear();
@@ -7425,10 +7434,11 @@ ${names}`)) return;
   renderMappingCards();
 }
 
-function clearMapping(plat) {
+async function clearMapping(plat) {
   if (!confirm(`確定清除 ${PLATFORMS[plat].label} 的欄位對應設定？`)) return;
   delete mappings[plat];
-  /* mappings saved via saveMappingToDB */
+  localStorage.setItem('mappings', JSON.stringify(mappings));
+  try { await SB.delete('mappings', plat); } catch(e) { console.warn('clearMapping:', e.message); }
   renderMappingCards();
 }
 
