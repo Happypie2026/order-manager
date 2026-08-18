@@ -3557,17 +3557,15 @@ async function doImport() {
     added++;
   });
 
-  // Save newly imported orders individually
+  // Save newly imported orders individually (new orders are pushed to end)
   localStorage.setItem('orders', JSON.stringify(orders));
-  const newOrders = orders.slice(0, added);
+  const newOrders = orders.slice(orders.length - added);
   for (const o of newOrders) {
     try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('importSave:', e.message); }
   }
   importState._added = added;
   importState._skipped = skipped;
   updatePendingBadge();
-  if (settings.sbUrl && settings.sbKey) syncToSupabase();
-
   // Detect new product name+spec combos not yet mapped
   const newCombos = detectUnmappedProducts();
   if (newCombos.length > 0 && products.length > 0) {
@@ -3774,8 +3772,8 @@ async function saveProductMappingAndFinish() {
     return o;
   });
   localStorage.setItem('orders', JSON.stringify(orders));
-  // Save newly imported orders to Supabase
-  for (const o of orders.slice(0, added)) {
+  // Save newly imported orders to Supabase (pushed to end)
+  for (const o of orders.slice(orders.length - added)) {
     try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('multiRowSave:', e.message); }
   }
   finishImport();
