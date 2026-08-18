@@ -3370,8 +3370,9 @@ function guessColumn(key, headers) {
     tracking_number:       ['追蹤號','物流號碼','運單號','tracking'],
   };
   const candidates = guesses[key] || [];
+  const safeHeaders = (headers || []).filter(h => h != null && h !== '');
   for (const c of candidates) {
-    const found = headers.find(h => h.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(h.toLowerCase()));
+    const found = safeHeaders.find(h => String(h).toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(String(h).toLowerCase()));
     if (found) return found;
   }
   return '';
