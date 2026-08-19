@@ -3002,8 +3002,19 @@ async function deleteProductFromDB(id) {
 }
 async function saveMappingToDB(platform, mapping) {
   mappings[platform] = mapping;
-  /* mappings saved via saveMappingToDB */
-  try { await SB.upsert('mappings', { platform, mapping }); } catch(e) { console.warn('saveMapping:', e.message); }
+  try {
+    // Use explicit conflict resolution on 'platform' column
+    const res = await fetch(`${SB.url()}/rest/v1/mappings`, {
+      method: 'POST',
+      headers: { ...SB.headers(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ platform, mapping }]),
+    });
+    if (!res.ok) {
+      let errMsg = `UPSERT mappings failed: ${res.status}`;
+      try { const body = await res.json(); errMsg += ' — ' + (body.message || body.error || JSON.stringify(body)); } catch(e) {}
+      console.warn('saveMapping:', errMsg);
+    }
+  } catch(e) { console.warn('saveMapping:', e.message); }
 }
 async function saveProductNameMappings() {
   localStorage.setItem('productNameMappings', JSON.stringify(productNameMappings));
@@ -3314,8 +3325,11 @@ function buildMappingUI(hasSaved) {
     : `<div class="alert alert-warning">⚠️ 此平台為首次匯入，請手動設定欄位對應。設定後會自動儲存。</div>`;
 
   document.getElementById('mappingBody').innerHTML = SYSTEM_FIELDS_FOR(importState.platform).map(f => {
-    const saved = importState.mapping[f.key] || '';
-    const autoGuess = !saved ? guessColumn(f.key, importState.csvHeaders) : saved;
+    // If hasSaved: use saved value (even empty string = intentionally not mapped)
+    // If not hasSaved (first time): use guessColumn
+    const savedVal = importState.mapping[f.key];
+    const hasSavedVal = hasSaved && (savedVal !== undefined);
+    const autoGuess = hasSavedVal ? (savedVal || '') : guessColumn(f.key, importState.csvHeaders);
     const preview = autoGuess ? (previewRow[autoGuess] || '') : '';
     return `<tr>
       <td><strong>${f.label}</strong></td>
@@ -3774,8 +3788,12 @@ async function saveProductMappingAndFinish() {
   });
   localStorage.setItem('orders', JSON.stringify(orders));
   // Save newly imported orders to Supabase (pushed to end)
-  for (const o of orders.slice(orders.length - added)) {
-    try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('multiRowSave:', e.message); }
+  const addedCount = importState._added || 0;
+  if (addedCount > 0) {
+    const newOrders = orders.slice(orders.length - addedCount);
+    for (const o of newOrders) {
+      try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('multiRowSave:', e.message); }
+    }
   }
   finishImport();
 }
@@ -7383,7 +7401,7 @@ async function saveMappingCard(plat) {
   if (!mappings[plat]) return;
   localStorage.setItem('mappings', JSON.stringify(mappings));
   try {
-    await SB.upsert('mappings', { platform: plat, mapping: mappings[plat] });
+    await saveMappingToDB(plat, mappings[plat]);
     // Show brief success indication
     const btn = document.querySelector(`#colCard_${plat} .btn-primary`);
     if (btn) { btn.textContent = '✅ 已儲存'; setTimeout(() => { btn.textContent = '💾 儲存'; }, 1500); }
