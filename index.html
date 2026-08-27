@@ -69,7 +69,7 @@
   .sidebar-toggle { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.45); font-size: 15px; line-height: 1; padding: 4px 5px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: color 0.15s; }
   .sidebar-toggle:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
-  .sidebar-nav { padding: 0.5rem 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
+  .sidebar-nav { padding: 0.5rem 0; flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
   .nav-section { padding: 0.4rem 1rem 0.15rem; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; white-space: nowrap; transition: opacity 0.15s; }
   .nav-item { display: flex; align-items: center; gap: 9px; padding: 0.48rem 1rem; font-size: 13px; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; }
   .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
@@ -542,7 +542,7 @@
             onmouseover="this.style.borderColor='rgba(255,255,255,0.5)';this.style.color='rgba(255,255,255,0.9)'"
             onmouseout="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.5)'">＋</button>
         </div>
-        <div id="navHoldingAreaItems" style="max-height:200px;overflow-y:auto"></div>
+        <div id="navHoldingAreaItems"></div>
       </div>
       <div class="nav-item" onclick="showPage('vendors')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
