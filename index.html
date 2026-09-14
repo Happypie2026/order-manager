@@ -69,7 +69,7 @@
   .sidebar-toggle { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.45); font-size: 15px; line-height: 1; padding: 4px 5px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: color 0.15s; }
   .sidebar-toggle:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
-  .sidebar-nav { padding: 0.5rem 0; flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+  .sidebar-nav { padding: 0.5rem 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
   .nav-section { padding: 0.4rem 1rem 0.15rem; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; white-space: nowrap; transition: opacity 0.15s; }
   .nav-item { display: flex; align-items: center; gap: 9px; padding: 0.48rem 1rem; font-size: 13px; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; }
   .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
@@ -85,7 +85,7 @@
   .nav-item-parent .nav-arrow { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.35); transition: transform 0.2s; }
   .nav-item-parent.open .nav-arrow { transform: rotate(90deg); }
   .nav-submenu { overflow: hidden; max-height: 0; transition: max-height 0.25s ease; }
-  .nav-submenu.open { max-height: 800px; }
+  .nav-submenu.open { max-height: 300px; }
   .nav-subitem { display: flex; align-items: center; gap: 8px; padding: 0.38rem 1rem 0.38rem 2.2rem; font-size: 12.5px; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; white-space: nowrap; border-left: 2px solid transparent; }
   .nav-subitem:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.04); }
   .nav-subitem.active { color: #fff; background: rgba(255,255,255,0.08); border-left-color: var(--accent-mid); }
@@ -535,14 +535,11 @@
         <div class="nav-subitem" id="subOrders-active" onclick="showOrdersView('active')">訂單列表</div>
         <div class="nav-subitem" id="subOrders-shipped" onclick="showOrdersView('shipped')">已出貨訂單</div>
         <div class="nav-subitem" id="subOrders-cancelled" onclick="showOrdersView('cancelled')">已取消訂單</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding-right:8px">
-          <div class="nav-subitem" id="subOrders-holding" onclick="showOrdersView('holding')" style="flex:1">訂單暫存區</div>
-          <button onclick="openHoldingAreaModal()" title="新增暫存區"
-            style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);padding:1px 7px;border-radius:4px;font-size:13px;cursor:pointer;flex-shrink:0;line-height:1.6"
-            onmouseover="this.style.borderColor='rgba(255,255,255,0.5)';this.style.color='rgba(255,255,255,0.9)'"
-            onmouseout="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.5)'">＋</button>
-        </div>
+        <div class="nav-subitem" id="subOrders-holding" onclick="showOrdersView('holding')">訂單暫存區</div>
         <div id="navHoldingAreaItems"></div>
+        <div style="padding:4px 1rem 0 2.2rem">
+          <button onclick="openHoldingAreaModal()" style="background:none;border:1.5px dashed rgba(255,255,255,0.2);color:rgba(255,255,255,0.4);padding:4px 10px;border-radius:var(--radius-sm);font-size:11.5px;cursor:pointer;width:100%;text-align:left" title="新增暫存區">＋ 新增暫存區</button>
+        </div>
       </div>
       <div class="nav-item" onclick="showPage('vendors')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -3578,8 +3575,19 @@ async function doImport() {
   // Save newly imported orders individually (new orders are pushed to end)
   localStorage.setItem('orders', JSON.stringify(orders));
   const newOrders = orders.slice(orders.length - added);
+  let savedCount = 0, failedCount = 0;
   for (const o of newOrders) {
-    try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('importSave:', e.message); }
+    try {
+      await SB.upsert('orders', toDbOrder(o));
+      savedCount++;
+    } catch(e) {
+      console.error('importSave failed:', e.message, o.order_id);
+      failedCount++;
+    }
+  }
+  console.log(`[Import] Saved ${savedCount}/${newOrders.length} orders to Supabase`);
+  if (failedCount > 0) {
+    alert(`⚠️ 有 ${failedCount} 筆訂單未能儲存到資料庫，請重試或聯絡系統管理員。`);
   }
   importState._added = added;
   importState._skipped = skipped;
@@ -3794,14 +3802,18 @@ async function saveProductMappingAndFinish() {
   const addedCount = importState._added || 0;
   if (addedCount > 0) {
     const newOrders = orders.slice(orders.length - addedCount);
+    let s2 = 0, f2 = 0;
     for (const o of newOrders) {
-      try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('multiRowSave:', e.message); }
+      try { await SB.upsert('orders', toDbOrder(o)); s2++; }
+      catch(e) { console.error('backpatchSave failed:', e.message, o.order_id); f2++; }
     }
+    console.log(`[Import] Back-patch saved ${s2}/${newOrders.length} orders to Supabase`);
+    if (f2 > 0) alert(`⚠️ 有 ${f2} 筆訂單未能更新到資料庫。`);
   }
   finishImport();
 }
 
-function skipProductMapping() {
+async function skipProductMapping() {
   const combos = importState._pendingCombos || [];
   combos.forEach(c => {
     if (!productNameMappings[c.key]) {
@@ -3809,6 +3821,19 @@ function skipProductMapping() {
     }
   });
   saveProductNameMappings();
+  // Also save orders to Supabase (in case doImport save failed)
+  const addedCount = importState._added || 0;
+  if (addedCount > 0) {
+    localStorage.setItem('orders', JSON.stringify(orders));
+    const newOrders = orders.slice(orders.length - addedCount);
+    let saved = 0, failed = 0;
+    for (const o of newOrders) {
+      try { await SB.upsert('orders', toDbOrder(o)); saved++; }
+      catch(e) { console.error('skipMapping save failed:', e.message); failed++; }
+    }
+    console.log(`[Import] skipProductMapping saved ${saved}/${newOrders.length} orders to Supabase`);
+    if (failed > 0) alert(`⚠️ 有 ${failed} 筆訂單未能儲存到資料庫，請重試匯入。`);
+  }
   finishImport();
 }
 
