@@ -2854,6 +2854,8 @@ const SB = {
 
 // Load all data from Supabase into local state
 async function loadFromSupabase() {
+  // Clear orders from localStorage to free space (orders loaded from Supabase)
+  try { localStorage.removeItem('orders'); } catch(e) {}
   if (!settings.sbUrl || !settings.sbKey) {
     console.warn('Supabase not configured, using localStorage');
     orders       = JSON.parse(localStorage.getItem('orders') || '[]');
@@ -2948,7 +2950,7 @@ function toDbOrder(o) {
 }
 
 async function saveOrders() {
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   if (!orders.length) return;
   try {
     await SB.upsert('orders', orders.map(toDbOrder));
@@ -2956,13 +2958,13 @@ async function saveOrders() {
 }
 
 async function saveOrder_DB(o) {
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('saveOrder_DB:', e.message); }
 }
 
 async function deleteOrderFromDB(id) {
   orders = orders.filter(o => o.id !== id);
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   try { await SB.delete('orders', id); } catch(e) { console.warn('deleteOrder:', e.message); }
 }
 async function saveVendors() {
@@ -3576,7 +3578,7 @@ async function doImport() {
   });
 
   // Save newly imported orders individually (new orders are pushed to end)
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   const newOrders = orders.slice(orders.length - added);
   let savedCount = 0, failedCount = 0;
   for (const o of newOrders) {
@@ -3804,7 +3806,7 @@ async function saveProductMappingAndFinish() {
     }
     return o;
   });
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   // Save newly imported orders to Supabase (pushed to end)
   const addedCount = importState._added || 0;
   if (addedCount > 0) {
@@ -3831,7 +3833,7 @@ async function skipProductMapping() {
   // Also save orders to Supabase (in case doImport save failed)
   const addedCount = importState._added || 0;
   if (addedCount > 0) {
-    localStorage.setItem('orders', JSON.stringify(orders));
+    // orders too large for localStorage - stored in Supabase only
     const newOrders = orders.slice(orders.length - addedCount);
     let saved = 0, failed = 0;
     for (const o of newOrders) {
@@ -4191,7 +4193,7 @@ async function applyBatchStatus() {
   // Update local array
   const ids = [...selectedOrders];
   orders = orders.map(o => ids.includes(o.id) ? { ...o, status } : o);
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
 
   // Save each updated order individually to Supabase
   let failed = 0;
@@ -4221,7 +4223,7 @@ async function bulkUpdateStatus(status) {
   if (!selectedOrders.size) { alert('請先勾選訂單'); return; }
   const ids = [...selectedOrders];
   orders = orders.map(o => ids.includes(o.id) ? { ...o, status } : o);
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   for (const id of ids) {
     const o = orders.find(x => x.id === id);
     if (o) { try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('bulkUpdateStatus:', e.message); } }
@@ -4376,7 +4378,7 @@ async function deleteHoldingArea(id) {
   const affected = orders.filter(o => o.holding_area_id===id).map(o => ({...o, holding_area_id:''}));
   orders = orders.map(o => o.holding_area_id===id ? {...o, holding_area_id:''} : o);
   await deleteHoldingAreaFromDB(id);
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   for (const o of affected) {
     try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('deleteHA order:', e.message); }
   }
@@ -4457,7 +4459,7 @@ async function quickMoveToHolding(orderId, haId) {
   if (idx < 0) return;
   orders[idx] = { ...orders[idx], holding_area_id: haId };
   await saveOrder_DB(orders[idx]);
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   renderHoldingAreas();
   renderOrders();
   renderOrderPlatTabs();
@@ -4482,7 +4484,7 @@ function openBatchHoldModal() {
 async function batchMoveToHoldingArea(haId) {
   const ids = [...selectedOrders];
   orders = orders.map(o => ids.includes(o.id) ? {...o, holding_area_id: haId} : o);
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   for (const id of ids) {
     const o = orders.find(x => x.id === id);
     if (o) { try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('batchMove:', e.message); } }
@@ -4712,7 +4714,7 @@ async function confirmSmartMergeAll() {
         } catch(e) { console.warn('delete secondary:', e.message); }
       }
 
-      localStorage.setItem('orders', JSON.stringify(orders));
+      // orders too large for localStorage - stored in Supabase only
       successCount++;
     } catch(e) {
       console.error('合併失敗:', e);
@@ -4952,7 +4954,7 @@ async function confirmMerge() {
   });
 
   // Save merged order and secondary orders to Supabase
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   const mergedO = orders.find(o => o.id === _mergeSelectedPrimary);
   if (mergedO) {
     try { await SB.upsert('orders', toDbOrder(mergedO)); } catch(e) { console.warn('mergeSave primary:', e.message); }
@@ -5397,7 +5399,7 @@ async function saveDrawerEdit() {
                                   product_qty: primary?.qty || orders[idx].product_qty } : {}),
   };
 
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   try {
     await SB.upsert('orders', toDbOrder(orders[idx]));
   } catch(e) {
@@ -5658,7 +5660,7 @@ async function saveOrder() {
 }
 
 async function saveOrder_DB(o) {
-  localStorage.setItem('orders', JSON.stringify(orders));
+  // orders too large for localStorage - stored in Supabase only
   try { await SB.upsert('orders', toDbOrder(o)); } catch(e) { console.warn('saveOrder_DB:', e.message); }
 }
 
