@@ -3406,8 +3406,11 @@ function updateMapping(key, val) {
 }
 
 async function doImport() {
+  try {
+  console.log('[doImport] 開始匯入, platform:', importState.platform, 'rows:', importState.csvData?.length);
   // Validate required fields
   const missing = SYSTEM_FIELDS_FOR(importState.platform).filter(f => f.required && !importState.mapping[f.key]);
+  console.log('[doImport] missing fields:', missing.map(f=>f.label), 'mapping:', importState.mapping);
   if (missing.length) { alert('請設定必填欄位：' + missing.map(f => f.label).join('、')); return; }
 
   // Save column mapping
@@ -3599,6 +3602,10 @@ async function doImport() {
     setImportStep(3.5);
   } else {
     finishImport();
+  }
+  } catch(err) {
+    console.error('[doImport] 匯入錯誤:', err);
+    alert('匯入發生錯誤：' + err.message + '\n請開啟 F12 Console 查看詳情。');
   }
 }
 
